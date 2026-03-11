@@ -150,6 +150,8 @@ function renderQcCylinders() {
                 fc: cyl.fc,
                 tma: cyl.tma,
                 tipo: cyl.tipo,
+                cast_date: cyl.cast_date,
+                slump_cm: cyl.slump_cm,
                 slump: cyl.rev || cyl.slump_cm,
                 cylinders: []
             });
