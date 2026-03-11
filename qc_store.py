@@ -29,7 +29,7 @@ class QCLabStoreMixin:
                 params.append(sample_id)
             if pending_only:
                 query += " AND c.status = 'pendiente'"
-            query += " ORDER BY c.expected_test_date ASC LIMIT ?"
+            query += " ORDER BY s.sample_code ASC, c.target_age_days ASC LIMIT ?"
             params.append(limit)
             
             cur = conn.execute(query, tuple(params))
