@@ -445,23 +445,24 @@ function setupListeners() {
 
             if (!currentTestCylinderId) return;
 
-            const formData = new FormData();
-            formData.append("strength_kgcm2", document.getElementById("testStrength").value);
-            formData.append("notes", document.getElementById("testNotes").value);
+            const formData = new FormData(testCylinderForm);
+            formData.set("strength_kgcm2", document.getElementById("testStrength").value);
+            formData.set("notes", document.getElementById("testNotes").value);
             formData.append("break_date", (window.AppGlobals && window.AppGlobals.getTodayCancun) ? window.AppGlobals.getTodayCancun() : new Date().toISOString().split("T")[0]);
             formData.append("status", "ensayado");
+            formData.append("failure_type", document.getElementById("testFailureType").value);
 
             if (currentCompressedFile) {
                 formData.append("image", currentCompressedFile);
             }
 
             try {
-                const response = await apiFetch(`/api/qclab/cylinders/${currentTestCylinderId}/test`, {
+                const res = await fetch(`/api/qclab/cylinders/${currentTestCylinderId}/test`, {
                     method: "POST",
                     body: formData
                 });
 
-                const data = await response.json();
+                const data = await res.json();
                 if (!data.ok) throw new Error(data.error);
 
                 if (typeof setStatus === 'function') setStatus("Ruptura registrada correctamente.", 'ok');
@@ -496,6 +497,7 @@ window.openTestModal = function (cylinderId, sampleCode, isEdit = false) {
         if (cyl) {
             document.getElementById("testStrength").value = cyl.strength_kgcm2 || "";
             document.getElementById("testNotes").value = cyl.notes || "";
+            document.getElementById("testFailureType").value = cyl.failure_type || "";
             if (submitBtn) submitBtn.innerText = "Actualizar y Subir";
         }
     } else {
@@ -511,17 +513,32 @@ window.openTestModal = function (cylinderId, sampleCode, isEdit = false) {
 window.applyCalculatedStrength = function() {
     const load = parseFloat(document.getElementById("calcLoad").value);
     const diameter = parseFloat(document.getElementById("calcDiameter").value);
+    const factor = parseFloat(document.getElementById("calcFactor").value) || 1.0;
+    
     if (isNaN(load) || load <= 0) {
         if (typeof setStatus === 'function') setStatus("Ingresa una carga válida.", 'warn');
         return;
     }
 
+    // Identify current sample design f'c
+    let designFc = 250; 
+    const currentCyl = stateQcCylinders.find(c => c.id === currentTestCylinderId);
+    if (currentCyl) {
+        const sample = stateQcSamples.find(s => s.id === currentCyl.sample_id);
+        if (sample && sample.fc_design) {
+            designFc = parseFloat(sample.fc_design);
+        }
+    }
+
     // Areas: 15cm -> 176.71 cm2, 10cm -> 78.54 cm2
     const area = (diameter === 10) ? 78.54 : 176.71;
-    const strength = load / area;
+    const strengthObtained = (load / area) * factor;
+    const achievementPercent = (strengthObtained / designFc) * 100;
 
-    document.getElementById("testStrength").value = strength.toFixed(1);
-    if (typeof setStatus === 'function') setStatus(`Calculado: ${load}kg / ${area}cm² = ${strength.toFixed(2)} kg/cm²`, 'ok');
+    document.getElementById("testStrength").value = strengthObtained.toFixed(1);
+    
+    const msg = `Cálculo: (${load}kg / ${area}cm²) * ${factor.toFixed(2)} = ${strengthObtained.toFixed(2)} kg/cm² (${achievementPercent.toFixed(1)}% de f'c ${designFc})`;
+    if (typeof setStatus === 'function') setStatus(msg, 'ok');
 }
 
 window.closeTestModal = function () {

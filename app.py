@@ -751,6 +751,7 @@ class AppStore(FleetStoreMixin, InventoryStoreMixin, QCLabStoreMixin, UserStoreM
             self._ensure_column(conn, "audit_log", "entity_id", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column(conn, "audit_log", "dataset_id", "INTEGER")
             self._ensure_column(conn, "audit_log", "details_json", "TEXT NOT NULL DEFAULT '{}'")
+            self._ensure_column(conn, "qc_cylinders", "failure_type", "TEXT NOT NULL DEFAULT ''")
 
             now = now_str()
             for item in DEFAULT_USERS:

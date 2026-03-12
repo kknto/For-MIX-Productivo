@@ -145,9 +145,10 @@ class QCLabStoreMixin:
                     "status = ?",
                     "strength_kgcm2 = ?",
                     "break_date = ?",
-                    "notes = ?"
+                    "notes = ?",
+                    "failure_type = ?"
                 ]
-                params = [status, strength, payload.get("break_date") or now, notes]
+                params = [status, strength, payload.get("break_date") or now, notes, payload.get("failure_type", "")]
 
                 if image_path:
                     update_fields.append("image_path = ?")
