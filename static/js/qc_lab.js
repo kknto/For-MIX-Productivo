@@ -223,7 +223,7 @@ function renderQcCylinders() {
                 const percentAchieved = (cyl.strength_kgcm2 / cyl.fc_expected) * 100;
                 const perfClass = getPerformanceClass(percentAchieved, cyl.target_age_days);
                 perfHtml = `<span class="${perfClass}" title="Esperado para ${cyl.target_age_days}d: ${getExpectedPercentage(cyl.target_age_days)}% del f'c">
-                    ${percentAchieved.toFixed(1)}%
+                    ${percentAchieved.toFixed(2)}%
                 </span>`;
             }
 
@@ -529,12 +529,14 @@ window.applyCalculatedStrength = function() {
 
     // Areas: 15cm -> 176.71 cm2, 10cm -> 78.54 cm2
     const area = (diameter === 10) ? 78.54 : 176.71;
-    const strengthObtained = (load / area) * factor;
-    const achievementPercent = (strengthObtained / designFc) * 100;
+    const strengthRaw = (load / area) * factor;
+    const strengthRounded = Math.round(strengthRaw);
+    const mpaValue = strengthRaw / 10.197;
+    const achievementPercent = (strengthRaw / designFc) * 100;
 
-    document.getElementById("testStrength").value = strengthObtained.toFixed(1);
+    document.getElementById("testStrength").value = strengthRounded;
     
-    const msg = `Cálculo: (${load}kg / ${area}cm²) * ${factor.toFixed(2)} = ${strengthObtained.toFixed(2)} kg/cm² (${achievementPercent.toFixed(1)}% de f'c ${designFc})`;
+    const msg = `Cálculo: (${load}kg / ${area}cm²) * ${factor.toFixed(2)} = ${strengthRaw.toFixed(2)} kg/cm² (${mpaValue.toFixed(1)} MPa). % Logro: ${achievementPercent.toFixed(2)}% de f'c ${designFc}`;
     if (typeof setStatus === 'function') setStatus(msg, 'ok');
 }
 
