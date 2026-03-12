@@ -2481,6 +2481,8 @@ class AppStore(FleetStoreMixin, InventoryStoreMixin, QCLabStoreMixin, UserStoreM
                 m3 = float(data.get("dosificacion_m3", 0))
                 peso_real = float(data.get("peso_real_total", 0))
                 remision_no = str(data.get("remision_no", "")).strip()
+                cliente = str(data.get("cliente", "")).strip()
+                ubicacion = str(data.get("ubicacion", "")).strip()
                 created_at = data.get("created_at")
 
                 # Actualizar campos denormalizados
@@ -2510,6 +2512,8 @@ class AppStore(FleetStoreMixin, InventoryStoreMixin, QCLabStoreMixin, UserStoreM
                     snap["dose"] = m3
                     snap["realWeight"] = peso_real
                     snap["remisionNo"] = remision_no
+                    snap["cliente"] = cliente
+                    snap["ubicacion"] = ubicacion
                     if created_at:
                         snap["timestamp"] = created_at
                     conn.execute("UPDATE remisiones SET snapshot_json=? WHERE id=?", (json.dumps(snap, ensure_ascii=False), rid))

@@ -2688,6 +2688,10 @@ window.openEditRemisionModal = function (item) {
   document.getElementById("erM3").value = item.dosificacion_m3 || 0;
   document.getElementById("erWeight").value = item.peso_real_total || 0;
 
+  const snap = item.snapshot || {};
+  document.getElementById("erCliente").value = snap.cliente || "";
+  document.getElementById("erUbicacion").value = snap.ubicacion || "";
+
   // Formatear fecha para datetime-local (YYYY-MM-DDTHH:mm)
   if (item.created_at) {
     const dt = item.created_at.replace(' ', 'T').substring(0, 16);
@@ -2716,6 +2720,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const payload = {
         remision_no: document.getElementById("erNo").value,
         formula: document.getElementById("erFormula").value,
+        cliente: document.getElementById("erCliente").value,
+        ubicacion: document.getElementById("erUbicacion").value,
         dosificacion_m3: parseFloat(document.getElementById("erM3").value),
         peso_real_total: parseFloat(document.getElementById("erWeight").value),
         created_at: document.getElementById("erDate").value.replace('T', ' ') + ':00'
