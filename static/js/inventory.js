@@ -697,7 +697,14 @@
       <h2>Detalle de Remisiones</h2>
       <table>
         <thead>
-          <tr><th>No. Remisión</th><th>Diseño / f'c</th><th class="num">Volumen</th><th style="text-align:center;">Hora</th></tr>
+          <tr>
+            <th>No. Remisión</th>
+            <th>Diseño / f'c</th>
+            <th>Cliente</th>
+            <th>Ubicación</th>
+            <th class="num">Volumen</th>
+            <th style="text-align:center;">Hora</th>
+          </tr>
         </thead>
         <tbody>${remisionesRows}</tbody>
       </table>
