@@ -2470,12 +2470,23 @@ class AppStore(FleetStoreMixin, InventoryStoreMixin, QCLabStoreMixin, UserStoreM
         with self.lock:
             ts = now_str()
             with self._conn() as conn:
-                ds = self._resolve_dataset(conn, dataset_name)
+                # Buscar la remision globalmente por ID para obtener su dataset_id real
+                # Esto evita el error 400 cuando el parametro 'file' no coincide exactamente (vistas globales o recuperadas)
                 exists = conn.execute(
-                    "SELECT snapshot_json FROM remisiones WHERE id=? AND dataset_id=?", (rid, ds["id"])
+                    "SELECT dataset_id, snapshot_json FROM remisiones WHERE id=?", (rid,)
                 ).fetchone()
+                
                 if not exists:
                     raise FileNotFoundError("Remision no encontrada.")
+                
+                target_dataset_id = exists["dataset_id"]
+                
+                # Intentar resolver el dataset por nombre solo para auditoria/contexto si se proporciona
+                try:
+                    ds = self._resolve_dataset(conn, dataset_name)
+                except:
+                    # Si falla (vistas globales), usamos el dataset real de la remision
+                    ds = {"id": target_dataset_id, "name": dataset_name or "Global"}
 
                 formula = str(data.get("formula", "")).strip()
                 m3 = float(data.get("dosificacion_m3", 0))
@@ -2493,7 +2504,7 @@ class AppStore(FleetStoreMixin, InventoryStoreMixin, QCLabStoreMixin, UserStoreM
                     params.append(created_at)
                 
                 sql += " WHERE id=? AND dataset_id=?"
-                params.extend([rid, ds["id"]])
+                params.extend([rid, target_dataset_id])
                 
                 conn.execute(sql, params)
 
@@ -2526,7 +2537,7 @@ class AppStore(FleetStoreMixin, InventoryStoreMixin, QCLabStoreMixin, UserStoreM
                     username=actor,
                     entity="remision",
                     entity_id=str(rid),
-                    dataset_id=ds["id"],
+                    dataset_id=target_dataset_id,
                     details={
                         "file": ds["name"],
                         "remision_no": remision_no,
