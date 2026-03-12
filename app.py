@@ -1568,7 +1568,7 @@ class AppStore(FleetStoreMixin, InventoryStoreMixin, QCLabStoreMixin, UserStoreM
                 sql = f"""
                     SELECT r.id, r.remision_no, r.formula, r.fc, r.edad, r.tipo, r.tma, r.rev, r.comp, r.dosificacion_m3,
                            r.peso_receta, r.peso_teorico_total, r.peso_real_total, r.status, r.created_at, r.created_by,
-                           d.name as source_file
+                           r.snapshot_json, d.name as source_file
                     FROM remisiones r
                     JOIN datasets d ON r.dataset_id = d.id
                     {where_clause}
@@ -1601,6 +1601,7 @@ class AppStore(FleetStoreMixin, InventoryStoreMixin, QCLabStoreMixin, UserStoreM
                             "created_at": r["created_at"] or "",
                             "created_by": r["created_by"] or "",
                             "source_file": r["source_file"] or "",
+                            "snapshot": json.loads(r["snapshot_json"] or "{}") if r["snapshot_json"] else {},
                         }
                         for r in rows
                     ],

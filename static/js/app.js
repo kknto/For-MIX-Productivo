@@ -198,6 +198,8 @@ const doserRealBody = document.getElementById("doserRealBody");
 const doserRealWeight = document.getElementById("doserRealWeight");
 const doserExportReportBtn = document.getElementById("dExportReportBtn");
 const doseM3Input = document.getElementById("doseM3");
+const clienteInput = document.getElementById("dCliente");
+const ubicacionInput = document.getElementById("dUbicacion");
 const remisionNoInput = document.getElementById("dRemisionNo");
 const saveRemisionBtn = document.getElementById("dSaveRemisionBtn");
 const refreshRemisionBtn = document.getElementById("dRefreshRemisionBtn");
@@ -1817,9 +1819,13 @@ function buildDoserReportSnapshot() {
   const comp = getV("comp") || "-";
   const modDate = (isGlobal ? selectedRow._updated : getRowModDate(selectedRow)) || "-";
   const remisionNo = ((remisionNoInput?.value || "").toString().trim().toUpperCase()) || "-";
+  const cliente = ((clienteInput?.value || "").toString().trim().toUpperCase()) || "-";
+  const ubicacion = ((ubicacionInput?.value || "").toString().trim().toUpperCase()) || "-";
 
   return {
     remisionNo,
+    cliente,
+    ubicacion,
     file: state.file || "",
     qcUpdatedAt: state.qcUpdatedAt || "",
     formula,
@@ -1858,6 +1864,8 @@ function normalizeDoserReportSnapshot(raw, fallback = {}) {
     file: snap.file || fallback.file || "-",
     qcUpdatedAt: snap.qcUpdatedAt || fallback.qcUpdatedAt || "-",
     formula: snap.formula || "-",
+    cliente: snap.cliente || "-",
+    ubicacion: snap.ubicacion || "-",
     fc: snap.fc || "-",
     tipo: snap.tipo || "-",
     coloc: snap.coloc || "-",
@@ -2041,11 +2049,13 @@ function buildDoserReportHtml(rawSnapshot, reportDate) {
       <tbody>
         <tr>
           <th>Remision</th><td>${escapeHtml(snap.remisionNo)}</td>
+          <th>Cliente</th><td>${escapeHtml(snap.cliente)}</td>
+          <th>Ubicación</th><td>${escapeHtml(snap.ubicacion)}</td>
           <th>Formula</th><td>${escapeHtml(snap.formula)}</td>
-          <th>f'c</th><td>${escapeHtml(snap.fc)}</td>
-          <th>Tipo</th><td>${escapeHtml(snap.tipo)}</td>
         </tr>
         <tr>
+          <th>f'c</th><td>${escapeHtml(snap.fc)}</td>
+          <th>Tipo</th><td>${escapeHtml(snap.tipo)}</td>
           <th>Colocacion</th><td>${escapeHtml(snap.coloc)}</td>
           <th>T.M.A.</th><td>${escapeHtml(snap.tma)}</td>
           <th>Rev</th><td>${escapeHtml(snap.rev)}</td>
@@ -2620,6 +2630,7 @@ function renderRemisionList() {
     return;
   }
   items.forEach((item) => {
+    const snap = item.snapshot || {};
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(item.remision_no || "-")}</td>
@@ -2627,6 +2638,8 @@ function renderRemisionList() {
       <td>${escapeHtml(item.fc || "-")}</td>
       <td>${escapeHtml(item.tma || "-")}</td>
       <td>${formatNum(item.dosificacion_m3 || 0)}</td>
+      <td>${escapeHtml(snap.cliente || "-")}</td>
+      <td>${escapeHtml(snap.ubicacion || "-")}</td>
       <td>${formatNum(item.peso_real_total || 0)}</td>
       <td>${escapeHtml(item.created_at || "-")}</td>
       <td>${escapeHtml(item.source_file || "-")}</td>
@@ -2785,6 +2798,8 @@ async function saveRemision() {
       throw new Error(payload.error || "No se pudo guardar la remision.");
     }
     if (remisionNoInput) remisionNoInput.value = "";
+    if (clienteInput) clienteInput.value = "";
+    if (ubicacionInput) ubicacionInput.value = "";
     await loadRemisiones();
     setStatus(`Remision guardada: ${payload.remision_no}`, "ok");
     pushToast(`Remisión guardada con éxito: ${payload.remision_no}`, "ok");

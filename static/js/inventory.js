@@ -588,14 +588,20 @@
       ? (production.total_real_kg / production.total_teorico_kg) * 100
       : 100;
 
-    const remisionesRows = remisiones.map(r => `
-      <tr>
-        <td><strong>${escapeHtml(r.remision_no)}</strong></td>
-        <td>${escapeHtml(r.formula)}</td>
-        <td class="num">${formatNum(r.dosificacion_m3)} m³</td>
-        <td style="text-align:center;">${r.created_at.split(' ')[1] || ''}</td>
-      </tr>
-    `).join("") || "<tr><td colspan='4' style='text-align:center;'>No hubo remisiones</td></tr>";
+    const remisionesRows = remisiones.map(r => {
+      let snap = {};
+      try { snap = JSON.parse(r.snapshot_json || '{}'); } catch (e) { }
+      return `
+        <tr>
+          <td><strong>${escapeHtml(r.remision_no)}</strong></td>
+          <td>${escapeHtml(r.formula)}</td>
+          <td>${escapeHtml(snap.cliente || '-')}</td>
+          <td>${escapeHtml(snap.ubicacion || '-')}</td>
+          <td class="num">${formatNum(r.dosificacion_m3)} m³</td>
+          <td style="text-align:center;">${r.created_at.split(' ')[1] || ''}</td>
+        </tr>
+      `;
+    }).join("") || "<tr><td colspan='6' style='text-align:center;'>No hubo remisiones</td></tr>";
 
     const consumptionRows = consumption.map(c => `
       <tr>

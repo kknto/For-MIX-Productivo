@@ -277,7 +277,7 @@ class InventoryStoreMixin:
             consumption = _rows_to_dicts(cur)
 
             cur = conn.execute(
-                """SELECT id, remision_no, formula, dosificacion_m3, created_at
+                """SELECT id, remision_no, formula, dosificacion_m3, created_at, snapshot_json
                    FROM remisiones 
                    WHERE created_at LIKE ?
                    ORDER BY created_at ASC""",
