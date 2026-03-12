@@ -997,9 +997,25 @@
             <input type="number" id="testStrength" class="ui-dialog__input" step="0.1" required>
           </div>
 
+          <div class="form-group" style="margin-bottom: 1rem; padding: 10px; background: var(--bg-1); border-radius: 6px; border: 1px dashed var(--line);">
+            <label style="color:var(--brand); font-size:0.8rem; font-weight:600; display:block; margin-bottom:8px;">CALCULADORA DE RESISTENCIA</label>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <label style="font-size:0.75rem; color:var(--text-soft);">Carga Total (kg)
+                <input type="number" id="calcLoad" class="ui-dialog__input" style="padding:4px 8px;" placeholder="Ej: 16800">
+              </label>
+              <label style="font-size:0.75rem; color:var(--text-soft);">Diámetro (cm)
+                <select id="calcDiameter" class="ui-dialog__input" style="padding:4px 8px;">
+                  <option value="15">15 cm (176.71 cm²)</option>
+                  <option value="10">10 cm (78.54 cm²)</option>
+                </select>
+              </label>
+            </div>
+            <button type="button" class="btn btn--muted btn--small" style="width:100%; margin-top:8px; font-size:0.75rem;" onclick="window.applyCalculatedStrength()">Calcular y Aplicar</button>
+          </div>
+
           <div class="form-group" style="margin-bottom: 1rem;">
             <label for="testImageInput" style="color:var(--text-soft); font-size:0.85rem;">Evidencia Fotográfica
-              (Opcional, Se comprimirá &lt; 1MB)</label>
+              (Cambiar si se desea nueva imagen)</label>
             <input type="file" id="testImageInput" accept="image/jpeg, image/png" class="ui-dialog__input">
             <img id="compressPreviewImg" src="" alt="Vista previa"
               style="display:none; max-width:100%; margin-top:10px; border-radius:4px; max-height:200px; object-fit:contain;">

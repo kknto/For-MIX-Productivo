@@ -240,8 +240,11 @@ function renderQcCylinders() {
                 <td style="text-align:center;">
                     ${cyl.image_path ? `<img src="${cyl.image_path}" class="qc-thumbnail" onclick="window.open('${cyl.image_path}')" title="Ver Evidencia">` : '<span style="color:var(--text-muted); font-size:0.85em; opacity:0.6;">Sin foto</span>'}
                 </td>
-                <td style="text-align:center; display:flex; justify-content:center;">
-                    ${isPending ? `<button class="btn btn--primary btn--small" onclick="window.openTestModal(${cyl.id}, '${sample.sample_code}')" style="display:inline-flex; align-items:center; gap:4px; padding: 4px 12px;"><svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg> Ensaye</button>` : `<span style="color:var(--text-muted); font-size:0.85em; opacity:0.6;">Completado</span>`}
+                <td style="text-align:center; display:flex; justify-content:center; gap:8px;">
+                    ${isPending ? 
+                        `<button class="btn btn--primary btn--small" onclick="window.openTestModal(${cyl.id}, '${sample.sample_code}')" style="display:inline-flex; align-items:center; gap:4px; padding: 4px 12px;"><svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg> Ensaye</button>` : 
+                        `<button class="btn btn--muted btn--small" onclick="window.openTestModal(${cyl.id}, '${sample.sample_code}', true)" title="Editar Ensaye" style="padding: 4px 8px; color: var(--brand);"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>`
+                    }
                 </td>
             `;
             childRows.push(tr);
@@ -475,19 +478,50 @@ function setupListeners() {
     }
 }
 
-window.openTestModal = function (cylinderId, sampleCode) {
+window.openTestModal = function (cylinderId, sampleCode, isEdit = false) {
     const testCylinderModal = document.getElementById("testCylinderModal");
     const testCylinderForm = document.getElementById("testCylinderForm");
     const compressPreviewImg = document.getElementById("compressPreviewImg");
+    const submitBtn = testCylinderForm.querySelector('button[type="submit"]');
 
     currentTestCylinderId = cylinderId;
-    document.getElementById("testModalTitle").innerText = `Ensaye Cilindro: ${sampleCode}`;
+    document.getElementById("testModalTitle").innerText = (isEdit ? `Editar Ensaye: ` : `Ensaye Cilindro: `) + sampleCode;
+    
     if (testCylinderForm) testCylinderForm.reset();
     if (compressPreviewImg) compressPreviewImg.style.display = "none";
+
+    // Populate if editing
+    if (isEdit) {
+        const cyl = stateQcCylinders.find(c => c.id === cylinderId);
+        if (cyl) {
+            document.getElementById("testStrength").value = cyl.strength_kgcm2 || "";
+            document.getElementById("testNotes").value = cyl.notes || "";
+            if (submitBtn) submitBtn.innerText = "Actualizar y Subir";
+        }
+    } else {
+        if (submitBtn) submitBtn.innerText = "Registrar y Subir";
+    }
+
     if (testCylinderModal) {
         testCylinderModal.classList.remove("is-hidden");
         testCylinderModal.classList.add("is-active");
     }
+}
+
+window.applyCalculatedStrength = function() {
+    const load = parseFloat(document.getElementById("calcLoad").value);
+    const diameter = parseFloat(document.getElementById("calcDiameter").value);
+    if (isNaN(load) || load <= 0) {
+        if (typeof setStatus === 'function') setStatus("Ingresa una carga válida.", 'warn');
+        return;
+    }
+
+    // Areas: 15cm -> 176.71 cm2, 10cm -> 78.54 cm2
+    const area = (diameter === 10) ? 78.54 : 176.71;
+    const strength = load / area;
+
+    document.getElementById("testStrength").value = strength.toFixed(1);
+    if (typeof setStatus === 'function') setStatus(`Calculado: ${load}kg / ${area}cm² = ${strength.toFixed(2)} kg/cm²`, 'ok');
 }
 
 window.closeTestModal = function () {
@@ -497,6 +531,7 @@ window.closeTestModal = function () {
         testCylinderModal.classList.remove("is-active");
     }
     currentTestCylinderId = null;
+    currentCompressedFile = null;
 }
 
 window.openChartModal = async function (sampleId, sampleCode) {
