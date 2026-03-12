@@ -457,7 +457,7 @@ function setupListeners() {
             }
 
             try {
-                const res = await fetch(`/api/qclab/cylinders/${currentTestCylinderId}/test`, {
+                const res = await apiFetch(`/api/qclab/cylinders/${currentTestCylinderId}/test`, {
                     method: "POST",
                     body: formData
                 });
@@ -523,11 +523,8 @@ window.applyCalculatedStrength = function() {
     // Identify current sample design f'c
     let designFc = 250; 
     const currentCyl = stateQcCylinders.find(c => c.id === currentTestCylinderId);
-    if (currentCyl) {
-        const sample = stateQcSamples.find(s => s.id === currentCyl.sample_id);
-        if (sample && sample.fc_design) {
-            designFc = parseFloat(sample.fc_design);
-        }
+    if (currentCyl && currentCyl.fc_expected) {
+        designFc = parseFloat(currentCyl.fc_expected);
     }
 
     // Areas: 15cm -> 176.71 cm2, 10cm -> 78.54 cm2
