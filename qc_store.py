@@ -1,5 +1,6 @@
 import uuid
 import datetime
+import sqlite3
 
 class QCLabStoreMixin:
     def list_qc_samples(self, limit: int = 100) -> list[dict]:
@@ -16,7 +17,10 @@ class QCLabStoreMixin:
     def list_qc_cylinders(self, sample_id: int | None = None, pending_only: bool = False, limit: int = 500) -> list[dict]:
         with self._conn() as conn:
             query = """
-                SELECT c.*, s.sample_code, s.fc_expected, s.remision_id, s.cast_date, s.slump_cm,
+                SELECT c.id, c.sample_id, c.target_age_days, c.expected_test_date, c.status, 
+                       c.strength_kgcm2, c.break_date, c.image_path, c.notes, c.failure_type,
+                       (CASE WHEN c.image_data IS NOT NULL THEN 1 ELSE 0 END) as has_image_data,
+                       s.sample_code, s.fc_expected, s.remision_id, s.cast_date, s.slump_cm,
                        r.formula, r.fc, r.tma, r.tipo, r.rev, r.comp
                 FROM qc_cylinders c
                 JOIN qc_samples s ON c.sample_id = s.id
@@ -133,7 +137,7 @@ class QCLabStoreMixin:
                 cur = conn.execute("DELETE FROM qc_samples WHERE id = ?", (sample_id,))
                 return cur.rowcount > 0
 
-    def test_qc_cylinder(self, cylinder_id: int, payload: dict, image_path: str = "") -> dict:
+    def test_qc_cylinder(self, cylinder_id: int, payload: dict, image_path: str = "", image_data: bytes | None = None) -> dict:
         with self.lock:
             with self._conn() as conn:
                 now = self.get_now().strftime("%Y-%m-%d %H:%M:%S")
@@ -153,6 +157,10 @@ class QCLabStoreMixin:
                 if image_path:
                     update_fields.append("image_path = ?")
                     params.append(image_path)
+                
+                if image_data is not None:
+                    update_fields.append("image_data = ?")
+                    params.append(sqlite3.Binary(image_data) if not self.is_postgres else image_data)
 
                 params.append(cylinder_id)
                 query = f"UPDATE qc_cylinders SET {', '.join(update_fields)} WHERE id = ?"

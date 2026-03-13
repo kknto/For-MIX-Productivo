@@ -508,6 +508,7 @@ class AppStore(FleetStoreMixin, InventoryStoreMixin, QCLabStoreMixin, UserStoreM
     def _init_db(self):
         id_type = "SERIAL PRIMARY KEY" if self.is_postgres else "INTEGER PRIMARY KEY AUTOINCREMENT"
         real_type = "DOUBLE PRECISION" if self.is_postgres else "REAL"
+        blob_type = "BYTEA" if self.is_postgres else "BLOB"
         
         with self._conn() as conn:
             conn.executescript(
@@ -661,7 +662,9 @@ class AppStore(FleetStoreMixin, InventoryStoreMixin, QCLabStoreMixin, UserStoreM
                   strength_kgcm2 {real_type} NOT NULL DEFAULT 0,
                   break_date TEXT,
                   image_path TEXT NOT NULL DEFAULT '',
-                  notes TEXT NOT NULL DEFAULT ''
+                  image_data {blob_type} DEFAULT NULL,
+                  notes TEXT NOT NULL DEFAULT '',
+                  failure_type TEXT NOT NULL DEFAULT ''
                 );
                 CREATE INDEX IF NOT EXISTS idx_qc_cyl_expected_date ON qc_cylinders(expected_test_date ASC);
                 CREATE INDEX IF NOT EXISTS idx_qc_cyl_sample_id ON qc_cylinders(sample_id);
@@ -752,6 +755,7 @@ class AppStore(FleetStoreMixin, InventoryStoreMixin, QCLabStoreMixin, UserStoreM
             self._ensure_column(conn, "audit_log", "dataset_id", "INTEGER")
             self._ensure_column(conn, "audit_log", "details_json", "TEXT NOT NULL DEFAULT '{}'")
             self._ensure_column(conn, "qc_cylinders", "failure_type", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(conn, "qc_cylinders", "image_data", "BYTEA" if self.is_postgres else "BLOB")
 
             now = now_str()
             for item in DEFAULT_USERS:

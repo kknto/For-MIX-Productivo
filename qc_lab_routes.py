@@ -1,6 +1,7 @@
 import os
 import uuid
-from flask import Blueprint, jsonify, request, current_app
+import io
+from flask import Blueprint, jsonify, request, current_app, Response
 
 def register_qc_lab_routes(app, store, login_required):
     """
@@ -78,19 +79,54 @@ def register_qc_lab_routes(app, store, login_required):
         image_path = ""
         
         if file and file.filename:
+            # Still save to disk for local cache/preview if desired, 
+            # but primary storage will be DB now.
             uploads_dir = os.path.join(app.config.get("BASE_DIR", "."), "static", "uploads", "qc_images")
             os.makedirs(uploads_dir, exist_ok=True)
             
             ext = os.path.splitext(file.filename)[1]
             unique_name = f"{uuid.uuid4().hex}{ext}"
             full_path = os.path.join(uploads_dir, unique_name)
+            
+            # Read bytes for DB storage
+            image_data = file.read()
+            file.seek(0) # Reset pointer to save to disk too
             file.save(full_path)
+            
             image_path = f"/static/uploads/qc_images/{unique_name}"
         
         try:
             payload = request.form.to_dict()
-            updated_sample = store.test_qc_cylinder(cylinder_id, payload, image_path)
+            updated_sample = store.test_qc_cylinder(cylinder_id, payload, image_path, image_data)
             return jsonify({"ok": True, "sample": updated_sample})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+
+    @qc_bp.route("/cylinders/<int:cylinder_id>/image", methods=["GET"])
+    @login_required
+    def api_get_cylinder_image(cylinder_id):
+        try:
+            with store._conn() as conn:
+                row = conn.execute("SELECT image_data, image_path FROM qc_cylinders WHERE id = ?", (cylinder_id,)).fetchone()
+                if not row:
+                    return jsonify({"ok": False, "error": "Cilindro no encontrado"}), 404
+                
+                # 1. Prioridad: image_data (binario en DB)
+                if row.get("image_data"):
+                    return Response(row["image_data"], mimetype='image/jpeg')
+                
+                # 2. Fallback: image_path (archivo en disco)
+                if row.get("image_path"):
+                    path = row["image_path"]
+                    if path.startswith("/static/"):
+                        # Quitar el primer slash para os.path.join
+                        rel_path = path[1:] if path.startswith("/") else path
+                        full_path = os.path.join(current_app.root_path, rel_path)
+                        if os.path.exists(full_path):
+                            with open(full_path, "rb") as f:
+                                return Response(f.read(), mimetype='image/jpeg')
+                
+                return jsonify({"ok": False, "error": "Imagen no encontrada"}), 404
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 500
 

@@ -238,7 +238,7 @@ function renderQcCylinders() {
                 <td style="text-align:center; font-weight:600; color:${isPending ? 'var(--text-muted)' : 'var(--color-success)'};">${isPending ? '<span style="opacity:0.5">-</span>' : cyl.strength_kgcm2 + ' kg/cm²'}</td>
                 <td style="text-align:center;">${perfHtml}</td>
                 <td style="text-align:center;">
-                    ${cyl.image_path ? `<img src="${cyl.image_path}" class="qc-thumbnail" onclick="window.open('${cyl.image_path}')" title="Ver Evidencia">` : '<span style="color:var(--text-muted); font-size:0.85em; opacity:0.6;">Sin foto</span>'}
+                    ${(cyl.has_image_data || cyl.image_path) ? `<img src="/api/qclab/cylinders/${cyl.id}/image" class="qc-thumbnail" onclick="window.open('/api/qclab/cylinders/${cyl.id}/image')" title="Ver Evidencia">` : '<span style="color:var(--text-muted); font-size:0.85em; opacity:0.6;">Sin foto</span>'}
                 </td>
                 <td style="text-align:center; display:flex; justify-content:center; gap:8px;">
                     ${isPending ? 
