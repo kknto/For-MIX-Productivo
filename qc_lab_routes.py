@@ -77,6 +77,7 @@ def register_qc_lab_routes(app, store, login_required):
     def api_save_cylinder_test(cylinder_id):
         file = request.files.get("image")
         image_path = ""
+        image_data = None
         
         if file and file.filename:
             # Still save to disk for local cache/preview if desired, 

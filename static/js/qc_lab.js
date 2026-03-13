@@ -530,7 +530,7 @@ window.applyCalculatedStrength = function() {
     // Areas: 15cm -> 176.71 cm2, 10cm -> 78.54 cm2
     const area = (diameter === 10) ? 78.54 : 176.71;
     const strengthRaw = (load / area) * factor;
-    const strengthRounded = Math.round(strengthRaw);
+    const strengthRounded = parseFloat(strengthRaw.toFixed(1));
     const mpaValue = strengthRaw / 10.197;
     const achievementPercent = (strengthRaw / designFc) * 100;
 
