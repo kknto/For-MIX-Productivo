@@ -142,7 +142,14 @@ class QCLabStoreMixin:
             with self._conn() as conn:
                 now = self.get_now().strftime("%Y-%m-%d %H:%M:%S")
                 status = payload.get("status", "ensayado")
-                strength = float(payload.get("strength_kgcm2", 0))
+                
+                # Robust numeric conversion for strength
+                try:
+                    strength_val = payload.get("strength_kgcm2", "0")
+                    strength = float(strength_val) if strength_val and str(strength_val).strip() != "" else 0.0
+                except (ValueError, TypeError):
+                    strength = 0.0
+
                 notes = payload.get("notes", "")
 
                 update_fields = [
