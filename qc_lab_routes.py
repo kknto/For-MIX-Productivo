@@ -1,7 +1,7 @@
 import os
 import uuid
 import io
-from flask import Blueprint, jsonify, request, current_app, Response
+from flask import Blueprint, jsonify, request, current_app, Response, render_template
 
 def register_qc_lab_routes(app, store, login_required):
     """
