@@ -150,6 +150,10 @@
                 data: { datasets: [{ label: 'Cilindros', data: scatterData, backgroundColor: '#3b82f6' }] },
                 options: { 
                     responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { min: 0, title: { display: true, text: 'Edad (Días)' } },
+                        y: { min: 0, title: { display: true, text: '% Logro' } }
+                    },
                     plugins: { tooltip: { callbacks: { label: (ctx) => `Muestra: ${ctx.raw.label} | %: ${ctx.raw.y}%` } } }
                 }
             });
