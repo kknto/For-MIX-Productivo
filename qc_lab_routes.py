@@ -168,4 +168,9 @@ def register_qc_lab_routes(app, store, login_required):
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 500
 
+    @qc_bp.route("/reports/trends", methods=["GET"])
+    @login_required
+    def api_get_qc_trends_page():
+        return render_template("qc_trends_report.html")
+
     app.register_blueprint(qc_bp)

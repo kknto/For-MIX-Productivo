@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis de Tendencias de Calidad | FORMIX</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/qc_lab.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <style>
+        body { background: #f1f5f9; padding: 20px; font-family: 'Inter', sans-serif; }
+        .report-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0; }
+        .report-title { display: flex; align-items: center; gap: 12px; }
+        .report-title h1 { margin: 0; font-size: 1.8rem; color: #1e293b; }
+        .qc-trend-container { max-width: 1400px; margin: 0 auto; }
+        .no-print { display: flex; gap: 10px; }
+        @media print { .no-print { display: none; } }
+    </style>
+</head>
+<body>
+    <div class="qc-trend-container">
+        <header class="report-header">
+            <div class="report-title">
+                <span style="font-size: 2rem;">📊</span>
+                <h1>Análisis de Tendencias de Calidad</h1>
+            </div>
+            <div class="no-print">
+                <button class="btn btn--muted" onclick="window.close()">Cerrar</button>
+                <button class="btn btn--primary" onclick="window.print()">🖨️ Imprimir</button>
+            </div>
+        </header>
+
+        <!-- Filters Bar -->
+        <div class="qc-trend-filters" style="display:flex; gap:15px; align-items:flex-end; margin-bottom: 25px; background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div>
+                <label style="display:block; font-size:0.85rem; margin-bottom:4px; font-weight:600; color:#64748b;">Desde (Fecha Colado):</label>
+                <input type="date" id="qcTrendStart" class="form-input" style="width: 160px; height: 40px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0 10px;">
+            </div>
+            <div>
+                <label style="display:block; font-size:0.85rem; margin-bottom:4px; font-weight:600; color:#64748b;">Hasta:</label>
+                <input type="date" id="qcTrendEnd" class="form-input" style="width: 160px; height: 40px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0 10px;">
+            </div>
+            <button class="btn btn--primary" style="height:40px; padding: 0 20px;" onclick="loadData()">🔍 Actualizar Análisis</button>
+            <div id="qcTrendStatus" style="font-size: 0.9rem; color: #64748b; font-style: italic; margin-left: auto;"></div>
+        </div>
+
+        <div class="qc-trend-grid">
+            <div class="qc-trend-card">
+                <h3>Dispersión: Edad vs % Logro</h3>
+                <div style="height: 400px; position: relative;">
+                   <canvas id="qcScatterChart"></canvas>
+                </div>
+                <p class="qc-chart-tip">Puntos aislados indican posibles errores de muestreo o materiales.</p>
+            </div>
+            <div class="qc-trend-card">
+                <h3>Tendencias de Resistencia (Promedios)</h3>
+                <div style="height: 400px; position: relative;">
+                   <canvas id="qcTrendLineChart"></canvas>
+                </div>
+                <p class="qc-chart-tip">Monitorea la consistencia del concreto colado por fechas.</p>
+            </div>
+        </div>
+
+        <div class="qc-grouped-results" style="margin-top:25px; background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <h3 style="margin-top:0; font-size:1.25rem;">📊 Tabla Maestra de Resultados (Agrupado por Muestra)</h3>
+            <div id="qcTrendTableContainer" class="qc-table-container">
+                <p style="text-align:center; padding:40px; color:#64748b;">Cargando datos históricos...</p>
+            </div>
+        </div>
+
+        <div class="qc-anomalies-section" style="margin-top:25px; border-radius: 12px;">
+            <h3>⚠️ Alertas de Variabilidad Extrema</h3>
+            <div class="qc-table-container">
+                <table class="qc-main-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Muestra</th>
+                            <th>Edad</th>
+                            <th>Resistencia</th>
+                            <th>% Logro</th>
+                            <th>Aviso</th>
+                        </tr>
+                    </thead>
+                    <tbody id="qcAnomaliesBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Inline duplication of essential logic since it's a standalone page
+        let scatterChart = null;
+        let trendLineChart = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+             // Set default dates
+            const startInput = document.getElementById("qcTrendStart");
+            const endInput = document.getElementById("qcTrendEnd");
+            const d = new Date();
+            d.setDate(d.getDate() - 30);
+            startInput.value = d.toISOString().split('T')[0];
+            endInput.value = new Date().toISOString().split('T')[0];
+            
+            loadData();
+        });
+
+        async function loadData() {
+            const statusEl = document.getElementById("qcTrendStatus");
+            const tableContainer = document.getElementById("qcTrendTableContainer");
+            const startVal = document.getElementById("qcTrendStart").value;
+            const endVal = document.getElementById("qcTrendEnd").value;
+            
+            statusEl.innerHTML = 'Cargando...';
+            
+            try {
+                let url = "/api/qclab/stats/trends";
+                const params = new URLSearchParams();
+                if (startVal) params.append("start_date", startVal);
+                if (endVal) params.append("end_date", endVal);
+                url += "?" + params.toString();
+
+                const res = await fetch(url);
+                const data = await res.json();
+                if (!data.ok) throw new Error(data.error);
+
+                statusEl.textContent = `Mostrando ${data.data.length} registros.`;
+                
+                renderCharts(data.data);
+                renderAnomalies(data.data);
+                renderTable(data.data);
+            } catch (err) {
+                statusEl.innerHTML = `<span style="color:red;">Error: ${err.message}</span>`;
+            }
+        }
+
+        function renderCharts(data) {
+            if (scatterChart) scatterChart.destroy();
+            if (trendLineChart) trendLineChart.destroy();
+            if(!data.length) return;
+
+            const scatterData = data.map(c => {
+                const res = parseFloat(c.strength_kgcm2) || 0;
+                const des = parseFloat(c.fc_expected) || 250;
+                return { x: parseInt(c.target_age_days), y: parseFloat(((res/des)*100).toFixed(2)), label: c.sample_code };
+            });
+
+            scatterChart = new Chart(document.getElementById('qcScatterChart'), {
+                type: 'scatter',
+                data: { datasets: [{ label: 'Cilindros', data: scatterData, backgroundColor: '#3b82f6' }] },
+                options: { 
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { tooltip: { callbacks: { label: (ctx) => `Muestra: ${ctx.raw.label} | %: ${ctx.raw.y}%` } } }
+                }
+            });
+
+            const groups = {};
+            data.forEach(c => {
+                const date = c.cast_date.split(' ')[0];
+                const age = parseInt(c.target_age_days);
+                const pct = (parseFloat(c.strength_kgcm2) / parseFloat(c.fc_expected)) * 100;
+                if(!groups[date]) groups[date] = {};
+                if(!groups[date][age]) groups[date][age] = [];
+                groups[date][age].push(pct);
+            });
+            const dates = Object.keys(groups).sort();
+            const datasets = [3, 7, 28].map(age => {
+                const color = age === 3 ? '#fbbf24' : (age === 7 ? '#3b82f6' : '#10b981');
+                return {
+                    label: `${age} días`,
+                    data: dates.map(d => {
+                        const v = groups[d][age] || [];
+                        return v.length ? (v.reduce((a,b)=>a+b,0)/v.length) : null;
+                    }),
+                    borderColor: color, tension: 0.3, spanGaps: true
+                };
+            });
+            trendLineChart = new Chart(document.getElementById('qcTrendLineChart'), {
+                type: 'line', data: { labels: dates, datasets },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { min:0, max:200 } } }
+            });
+        }
+
+        function renderTable(data) {
+            const container = document.getElementById("qcTrendTableContainer");
+            const samples = {};
+            data.forEach(c => {
+                if(!samples[c.sample_code]) samples[c.sample_code] = { ...c, cyls: {} };
+                samples[c.sample_code].cyls[c.target_age_days] = c;
+            });
+            const sorted = Object.values(samples).sort((a,b) => new Date(b.cast_date) - new Date(a.cast_date));
+            
+            let html = '<table class="qc-main-table"><thead><tr><th>Fecha</th><th>Muestra</th><th>Remisión</th><th>f\'c Esp.</th><th>3d (%)</th><th>7d (%)</th><th>28d (%)</th></tr></thead><tbody>';
+            sorted.forEach(s => {
+                const getAge = (age) => {
+                    const c = s.cyls[age];
+                    if(!c) return '<td>-</td>';
+                    const res = parseFloat(c.strength_kgcm2);
+                    const pct = (res/s.fc_expected)*100;
+                    return `<td class="col-center"><div class="val-strength">${res.toFixed(1)}</div><div class="val-pct ${pct<75?'val-pct-low':(pct>120?'val-pct-high':'val-pct-ok')}">${pct.toFixed(1)}%</div></td>`;
+                };
+                html += `<tr><td>${s.cast_date.split(' ')[0]}</td><td><strong>${s.sample_code}</strong></td><td>${s.remision_id}</td><td>${s.fc_expected}</td>${getAge(3)}${getAge(7)}${getAge(28)}</tr>`;
+            });
+            container.innerHTML = html + '</tbody></table>';
+        }
+
+        function renderAnomalies(data) {
+            const tbody = document.getElementById("qcAnomaliesBody");
+            const anom = data.filter(c => {
+                const p = (parseFloat(c.strength_kgcm2)/parseFloat(c.fc_expected))*100;
+                return p < 60 || p > 140;
+            });
+            tbody.innerHTML = anom.length ? anom.map(c => `<tr><td>${c.cast_date.split(' ')[0]}</td><td>${c.sample_code}</td><td>${c.target_age_days}d</td><td>${c.strength_kgcm2}</td><td>${((parseFloat(c.strength_kgcm2)/parseFloat(c.fc_expected))*100).toFixed(1)}%</td><td style="color:red;">Fuera de rango</td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center;">Sin anomalías</td></tr>';
+        }
+    </script>
+</body>
+</html>
