@@ -805,9 +805,12 @@
     </section>
 
     <section id="laboratorioView" class="view-pane is-hidden">
-      <header class="panel-header">
-        <h2>Laboratorio (Control de Calidad)</h2>
-        <p>Registro de muestras de concreto y control de ensayes a compresión de cilindros.</p>
+      <header class="panel-header" style="display: flex; justify-content: space-between; align-items: start;">
+        <div>
+          <h2>Laboratorio (Control de Calidad)</h2>
+          <p>Registro de muestras de concreto y control de ensayes a compresión de cilindros.</p>
+        </div>
+        <button id="btnShowTrends" class="btn btn--secondary" style="margin-top: 8px;">📊 Análisis de Tendencias</button>
       </header>
 
       <div id="qcDashboard" class="status-grid" style="margin-bottom: 16px;"></div>
@@ -970,6 +973,63 @@
     </div>
   </div>
 
+
+  <!-- Trend Analysis Modal -->
+  <div id="qcTrendModal" class="ui-dialog-host is-hidden" aria-hidden="true" style="z-index: 2000;">
+    <div class="ui-dialog" style="max-width: 1200px; width: 98%;">
+      <header class="ui-dialog__header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.5rem;">📊</span>
+          <h2 style="margin:0;">Análisis de Tendencias de Calidad</h2>
+        </div>
+        <button class="ui-dialog__close" onclick="window.closeTrendModal()">×</button>
+      </header>
+      <div class="ui-dialog__body" style="background: var(--bg); padding: 20px;">
+        <div class="qc-trend-grid">
+          <!-- Scatter Chart for Outliers -->
+          <div class="qc-trend-card">
+            <h3>Dispersión: Edad vs % Logro</h3>
+            <div style="height: 350px; position: relative;">
+               <canvas id="qcScatterChart"></canvas>
+            </div>
+            <p class="qc-chart-tip">Puntos aislados indican posibles errores de muestreo o materiales.</p>
+          </div>
+          <!-- Line Chart for Averages -->
+          <div class="qc-trend-card">
+            <h3>Tendencias de Resistencia (Promedios)</h3>
+            <div style="height: 350px; position: relative;">
+               <canvas id="qcTrendLineChart"></canvas>
+            </div>
+            <p class="qc-chart-tip">Monitorea la consistencia del concreto colado por fechas.</p>
+          </div>
+        </div>
+        
+        <!-- Anomalies Section -->
+        <div class="qc-anomalies-section">
+          <h3>⚠️ Alertas de Variabilidad Extrema</h3>
+          <div class="qc-table-container" style="max-height: 200px;">
+             <table class="qc-table" id="qcAnomaliesTable">
+               <thead>
+                 <tr>
+                    <th>Muestra</th>
+                    <th>Edad</th>
+                    <th>f'c Diseño</th>
+                    <th>f'c Real</th>
+                    <th>% Logro</th>
+                    <th>Fecha Ensayado</th>
+                 </tr>
+               </thead>
+               <tbody id="qcAnomaliesBody">
+               </tbody>
+             </table>
+          </div>
+        </div>
+      </div>
+      <footer class="ui-dialog__actions">
+        <button type="button" class="btn btn--muted" onclick="window.closeTrendModal()">Cerrar Informe</button>
+      </footer>
+    </div>
+  </div>
 
   <div id="uiToastHost" class="ui-toast-host" aria-live="polite" aria-atomic="false"></div>
   <div id="uiDialogHost" class="ui-dialog-host is-hidden" aria-hidden="true"></div>

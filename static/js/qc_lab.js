@@ -477,6 +477,11 @@ function setupListeners() {
     if (lookupBtn) {
         lookupBtn.addEventListener("click", lookupRemision);
     }
+
+    const trendsBtn = document.getElementById("btnShowTrends");
+    if (trendsBtn) {
+        trendsBtn.addEventListener("click", window.openTrendModal);
+    }
 }
 
 window.openTestModal = function (cylinderId, sampleCode, isEdit = false) {
@@ -707,6 +712,173 @@ function compressImage(file, maxWidth, maxHeight, quality) {
 let currentCompressedFile = null;
 
 
+
+/* === Trend Analysis & Charts === */
+let scatterChart = null;
+let trendLineChart = null;
+
+window.openTrendModal = async function() {
+    const modal = document.getElementById("qcTrendModal");
+    if (!modal) return;
+    
+    modal.classList.remove("is-hidden");
+    modal.classList.add("is-active");
+    
+    await loadTrendData();
+};
+
+window.closeTrendModal = function() {
+    const modal = document.getElementById("qcTrendModal");
+    if (modal) {
+        modal.classList.add("is-hidden");
+        modal.classList.remove("is-active");
+    }
+};
+
+async function loadTrendData() {
+    try {
+        const res = await apiFetch("/api/qclab/stats/trends");
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error);
+
+        renderTrendCharts(data.data);
+        renderAnomalies(data.data);
+    } catch (err) {
+        if (typeof setStatus === 'function') setStatus("Error al cargar tendencias: " + err.message, 'err');
+    }
+}
+
+function renderTrendCharts(data) {
+    // 1. Data for Scatter Chart (Age vs % Logro)
+    const scatterData = data.map(c => {
+        const strength = parseFloat(c.strength_kgcm2) || 0;
+        const design = parseFloat(c.fc_expected) || 250;
+        const percent = (strength / design) * 100;
+        return {
+            x: parseInt(c.target_age_days),
+            y: parseFloat(percent.toFixed(2)),
+            label: c.sample_code
+        };
+    });
+
+    if (scatterChart) scatterChart.destroy();
+    const ctxScatter = document.getElementById('qcScatterChart').getContext('2d');
+    if (ctxScatter) {
+        scatterChart = new Chart(ctxScatter, {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: 'Cilindros Ensayados',
+                    data: scatterData,
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1,
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { title: { display: true, text: 'Edad (Días)' }, min: 0 },
+                    y: { title: { display: true, text: '% Logro Resistencia' }, min: 0 }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `Muestra: ${ctx.raw.label} | Edad: ${ctx.raw.x}d | % Logro: ${ctx.raw.y}%`
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // 2. Data for Line Chart (Average % by Date)
+    const groups = {};
+    data.forEach(c => {
+        if (!c.cast_date) return;
+        const date = c.cast_date.split(' ')[0];
+        const age = parseInt(c.target_age_days);
+        const strength = parseFloat(c.strength_kgcm2) || 0;
+        const design = parseFloat(c.fc_expected) || 250;
+        const pct = (strength / design) * 100;
+
+        if (!groups[date]) groups[date] = {};
+        if (!groups[date][age]) groups[date][age] = [];
+        groups[date][age].push(pct);
+    });
+
+    const dates = Object.keys(groups).sort();
+    const ageSets = [3, 7, 28];
+    const datasets = ageSets.map(age => {
+        const color = age === 3 ? '#fbbf24' : (age === 7 ? '#60a5fa' : '#34d399');
+        return {
+            label: `${age} días`,
+            data: dates.map(d => {
+                const vals = groups[d][age] || [];
+                return vals.length ? parseFloat((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)) : null;
+            }),
+            borderColor: color,
+            backgroundColor: color,
+            tension: 0.3,
+            spanGaps: true
+        };
+    });
+
+    if (trendLineChart) trendLineChart.destroy();
+    const ctxLine = document.getElementById('qcTrendLineChart').getContext('2d');
+    if (ctxLine) {
+        trendLineChart = new Chart(ctxLine, {
+            type: 'line',
+            data: { labels: dates, datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { title: { display: true, text: '% Logro Promedio' }, min: 0, max: 200 }
+                }
+            }
+        });
+    }
+}
+
+function renderAnomalies(data) {
+    const tbody = document.getElementById("qcAnomaliesBody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+
+    const anomalies = data.filter(c => {
+        const strength = parseFloat(c.strength_kgcm2) || 0;
+        const design = parseFloat(c.fc_expected) || 250;
+        const pct = (strength / design) * 100;
+        // Definir anomalía como < 60% o > 140%
+        return (pct > 0 && (pct < 60 || pct > 140));
+    });
+
+    if (anomalies.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-soft); padding: 20px;">No se detectaron variaciones extremas en los datos actuales.</td></tr>`;
+        return;
+    }
+
+    anomalies.sort((a, b) => new Date(b.break_date || b.cast_date) - new Date(a.break_date || a.cast_date)).forEach(c => {
+        const strength = parseFloat(c.strength_kgcm2) || 0;
+        const design = parseFloat(c.fc_expected) || 250;
+        const pct = ((strength / design) * 100).toFixed(1);
+        
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td><strong>${c.sample_code}</strong></td>
+            <td style="text-align:center;">${c.target_age_days}d</td>
+            <td style="text-align:center;">${design} kg/cm²</td>
+            <td style="text-align:center; font-weight:bold; color:#ef4444;">${strength} kg/cm²</td>
+            <td style="text-align:center; font-weight:bold; color:#ef4444;">${pct}%</td>
+            <td style="text-align:center;">${c.break_date ? c.break_date.split(' ')[0] : (c.cast_date ? c.cast_date.split(' ')[0] : '-')}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
 
 window.loadQcLabData = loadLaboratoryData;
 window.initQcLab = initQcLab;

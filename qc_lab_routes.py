@@ -131,4 +131,17 @@ def register_qc_lab_routes(app, store, login_required):
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 500
 
+    @qc_bp.route("/stats/trends", methods=["GET"])
+    @login_required
+    def api_get_qc_trends():
+        try:
+            # Fetch last 200 cylinders with sample info
+            # We use a larger limit to have enough data for a meaningful trend
+            cylinders = store.list_qc_cylinders(limit=250)
+            # Filter only tested ones for the charts
+            tested = [c for c in cylinders if c.get("status") == "ensayado"]
+            return jsonify({"ok": True, "data": tested})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+
     app.register_blueprint(qc_bp)
