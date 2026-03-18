@@ -985,6 +985,20 @@
         <button class="ui-dialog__close" onclick="window.closeTrendModal()">×</button>
       </header>
       <div class="ui-dialog__body" style="background: var(--bg); padding: 20px;">
+        <!-- Filters Bar -->
+        <div class="qc-trend-filters" style="display:flex; gap:15px; align-items:flex-end; margin-bottom: 20px; background: rgba(0,0,0,0.03); padding: 15px; border-radius: 8px;">
+          <div>
+              <label style="display:block; font-size:0.85rem; margin-bottom:4px;">Desde (Fecha Colado):</label>
+              <input type="date" id="qcTrendStart" class="form-input" style="width: 150px;">
+          </div>
+          <div>
+              <label style="display:block; font-size:0.85rem; margin-bottom:4px;">Hasta:</label>
+              <input type="date" id="qcTrendEnd" class="form-input" style="width: 150px;">
+          </div>
+          <button class="btn btn--primary" onclick="window.loadTrendData()">🔍 Filtrar</button>
+          <div id="qcTrendStatus" style="font-size: 0.9rem; color: var(--text-soft); font-style: italic; margin-left: auto;"></div>
+        </div>
+
         <div class="qc-trend-grid">
           <!-- Scatter Chart for Outliers -->
           <div class="qc-trend-card">
@@ -1001,6 +1015,14 @@
                <canvas id="qcTrendLineChart"></canvas>
             </div>
             <p class="qc-chart-tip">Monitorea la consistencia del concreto colado por fechas.</p>
+          </div>
+        </div>
+        
+        <!-- Detailed Results Table -->
+        <div class="qc-grouped-results" style="margin-top:25px; background: white; border-radius: 8px; border: 1px solid var(--border); padding: 15px;">
+          <h3 style="margin-top:0;">📊 Tabla Maestra de Resultados (Agrupado por Muestra)</h3>
+          <div id="qcTrendTableContainer" class="qc-table-container" style="max-height: 500px; overflow-y: auto;">
+              <p style="text-align:center; padding:20px; color:var(--text-soft);">Cargando tabla de resultados...</p>
           </div>
         </div>
         

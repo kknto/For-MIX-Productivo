@@ -721,6 +721,18 @@ window.openTrendModal = async function() {
     const modal = document.getElementById("qcTrendModal");
     if (!modal) return;
     
+    // Set default dates if empty: last 30 days
+    const startInput = document.getElementById("qcTrendStart");
+    const endInput = document.getElementById("qcTrendEnd");
+    if (startInput && !startInput.value) {
+        const d = new Date();
+        d.setDate(d.getDate() - 30);
+        startInput.value = d.toISOString().split('T')[0];
+    }
+    if (endInput && !endInput.value) {
+        endInput.value = new Date().toISOString().split('T')[0];
+    }
+
     modal.classList.remove("is-hidden");
     modal.classList.add("is-active");
     
@@ -736,19 +748,44 @@ window.closeTrendModal = function() {
 };
 
 async function loadTrendData() {
+    const statusEl = document.getElementById("qcTrendStatus");
+    const tableContainer = document.getElementById("qcTrendTableContainer");
+    const startVal = document.getElementById("qcTrendStart").value;
+    const endVal = document.getElementById("qcTrendEnd").value;
+    
+    if (statusEl) statusEl.innerHTML = '<div class="qc-spinner" style="width:20px; height:20px; border-width:2px; display:inline-block; vertical-align:middle; margin-right:8px;"></div> Cargando datos...';
+    if (tableContainer) tableContainer.innerHTML = '<div class="qc-loading-overlay"><div class="qc-spinner"></div><p>Procesando resultados históricos...</p></div>';
+
     try {
-        const res = await apiFetch("/api/qclab/stats/trends");
+        let url = "/api/qclab/stats/trends";
+        const params = new URLSearchParams();
+        if (startVal) params.append("start_date", startVal);
+        if (endVal) params.append("end_date", endVal);
+        if (params.toString()) url += "?" + params.toString();
+
+        const res = await apiFetch(url);
         const data = await res.json();
         if (!data.ok) throw new Error(data.error);
 
+        if (statusEl) statusEl.textContent = `Mostrando ${data.data.length} records.`;
+        
         renderTrendCharts(data.data);
         renderAnomalies(data.data);
+        renderGroupedResultsTable(data.data);
     } catch (err) {
-        if (typeof setStatus === 'function') setStatus("Error al cargar tendencias: " + err.message, 'err');
+        if (statusEl) statusEl.innerHTML = `<span style="color:#ef4444;">Error: ${err.message}</span>`;
+        if (tableContainer) tableContainer.innerHTML = `<p style="text-align:center; padding:20px; color:#ef4444;">Error al cargar la tabla.</p>`;
     }
 }
 
 function renderTrendCharts(data) {
+    if (!data || data.length === 0) {
+        // Clear charts if no data
+        if (scatterChart) scatterChart.destroy();
+        if (trendLineChart) trendLineChart.destroy();
+        return;
+    }
+
     // 1. Data for Scatter Chart (Age vs % Logro)
     const scatterData = data.map(c => {
         const strength = parseFloat(c.strength_kgcm2) || 0;
@@ -844,6 +881,93 @@ function renderTrendCharts(data) {
     }
 }
 
+function renderGroupedResultsTable(data) {
+    const container = document.getElementById("qcTrendTableContainer");
+    if (!container) return;
+
+    if (!data || data.length === 0) {
+        container.innerHTML = '<p style="text-align:center; padding:20px; color:var(--text-soft);">Vaya, parece que no hay cilindros ensayados en este rango.</p>';
+        return;
+    }
+
+    // Group by sample code
+    const sampleGroups = {};
+    data.forEach(c => {
+        const key = c.sample_code || `ID-${c.sample_id}`;
+        if (!sampleGroups[key]) {
+            sampleGroups[key] = {
+                code: key,
+                cast_date: c.cast_date,
+                remision: c.remision_id || '-',
+                design_fc: c.fc_expected,
+                formula: c.formula || '-',
+                cyls: {}
+            };
+        }
+        sampleGroups[key].cyls[c.target_age_days] = c;
+    });
+
+    // Sort by date desc
+    const sortedSamples = Object.values(sampleGroups).sort((a,b) => new Date(b.cast_date) - new Date(a.cast_date));
+
+    let html = `
+        <table class="qc-main-table">
+            <thead>
+                <tr>
+                    <th>Fecha Colado</th>
+                    <th>Muestra</th>
+                    <th>Remisión</th>
+                    <th>Diseño / f'c</th>
+                    <th class="col-center">3d (%)</th>
+                    <th class="col-center">7d (%)</th>
+                    <th class="col-center">28d (%)</th>
+                    <th>Observaciones</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    sortedSamples.forEach(s => {
+        const getAgeCol = (age) => {
+            const cyl = s.cyls[age];
+            if (!cyl) return '<td class="col-center" style="color:#cbd5e1;">-</td>';
+            const res = parseFloat(cyl.strength_kgcm2) || 0;
+            const pct = (res / s.design_fc) * 100;
+            let statusClass = 'val-pct-ok';
+            if (pct < 75) statusClass = 'val-pct-low';
+            if (pct > 120) statusClass = 'val-pct-high';
+            
+            return `
+                <td class="col-center">
+                    <div class="val-strength">${res.toFixed(1)}</div>
+                    <div class="val-pct ${statusClass}">${pct.toFixed(1)}%</div>
+                </td>
+            `;
+        };
+
+        html += `
+            <tr>
+                <td>${s.cast_date ? s.cast_date.split(' ')[0] : '-'}</td>
+                <td><strong>${s.code}</strong></td>
+                <td>${s.remision}</td>
+                <td>
+                    <div style="font-size:0.8rem; color:#64748b;">${s.formula}</div>
+                    <strong>${s.design_fc} kg/cm²</strong>
+                </td>
+                ${getAgeCol(3)}
+                ${getAgeCol(7)}
+                ${getAgeCol(28)}
+                <td style="font-size:0.75rem; color:#64748b; max-width:150px;">
+                    ${Object.values(s.cyls).map(c => c.notes).filter(n => n).join('; ') || '-'}
+                </td>
+            </tr>
+        `;
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
 function renderAnomalies(data) {
     const tbody = document.getElementById("qcAnomaliesBody");
     if (!tbody) return;
@@ -853,12 +977,11 @@ function renderAnomalies(data) {
         const strength = parseFloat(c.strength_kgcm2) || 0;
         const design = parseFloat(c.fc_expected) || 250;
         const pct = (strength / design) * 100;
-        // Definir anomalía como < 60% o > 140%
         return (pct > 0 && (pct < 60 || pct > 140));
     });
 
     if (anomalies.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-soft); padding: 20px;">No se detectaron variaciones extremas en los datos actuales.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-soft); padding: 20px;">No se detectaron variaciones extremas en el rango seleccionado.</td></tr>`;
         return;
     }
 
