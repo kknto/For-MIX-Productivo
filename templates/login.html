@@ -4,8 +4,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Acceso - ALMEX</title>
-  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo_almex.png', v=cache_bust) }}">
+  <title>{{ instance_meta.login_title }}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename=instance_meta.logo_path, v=cache_bust) }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v=cache_bust) }}">
 </head>
 
@@ -13,12 +13,11 @@
   <main class="auth-layout">
     <section class="auth-card">
       <div class="auth-brand">
-        <img class="auth-logo" src="{{ url_for('static', filename='img/logo_almex.png', v=cache_bust) }}" alt="ALMEX">
+        <img class="auth-logo" src="{{ url_for('static', filename=instance_meta.logo_path, v=cache_bust) }}" alt="{{ instance_meta.brand_name }}">
         <div>
-          <h1 style="display: flex; align-items: center;">ALMEX <span
-              style="font-size: 0.5em; color: var(--brand); font-weight: 600; letter-spacing: 0.5px; border: 1px solid var(--brand); border-radius: 4px; padding: 2px 6px; margin-left: 8px; vertical-align: middle; background: rgba(0, 93, 166, 0.05); white-space: nowrap;">PLANTA
-              CANCÚN</span></h1>
-          <p>Acceso al sistema de diseños y dosificación</p>
+          <h1 style="display: flex; align-items: center;">{{ instance_meta.brand_name }} <span
+              style="font-size: 0.5em; color: var(--brand); font-weight: 600; letter-spacing: 0.5px; border: 1px solid var(--brand); border-radius: 4px; padding: 2px 6px; margin-left: 8px; vertical-align: middle; background: rgba(0, 93, 166, 0.05); white-space: nowrap;">{{ instance_meta.plant_name|upper }}</span></h1>
+          <p>Acceso al sistema de disenos y dosificacion</p>
         </div>
       </div>
       {% if error %}
@@ -29,17 +28,15 @@
         <label>Usuario
           <input type="text" name="username" maxlength="64" required autofocus>
         </label>
-        <label>Contraseña
+        <label>Contrasena
           <input type="password" name="password" maxlength="128" required>
         </label>
         <button type="submit" class="btn btn--primary">Ingresar</button>
       </form>
 
       <div class="auth-footer-branding">
-        <span style="font-size: 0.8rem; color: var(--text-soft); font-weight: 600; letter-spacing: 0.5px;">ForMIX by
-          LABSICO</span>
+        <span style="font-size: 0.8rem; color: var(--text-soft); font-weight: 600; letter-spacing: 0.5px;">{{ instance_meta.brand_tagline }}</span>
       </div>
-
     </section>
   </main>
 </body>

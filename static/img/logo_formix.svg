@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="ForMIX">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b4f8a"/>
+      <stop offset="100%" stop-color="#1f7a42"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="88" fill="#f4f8fb"/>
+  <rect x="40" y="40" width="432" height="432" rx="72" fill="url(#g)"/>
+  <path d="M144 150h160v52H204v54h84v52h-84v94h-60z" fill="#fff"/>
+  <path d="M332 150h36l46 80 46-80h36l-64 110 72 102h-38l-52-74-52 74h-38l72-102z" fill="#dff3e6"/>
+  <text x="256" y="430" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="46" font-weight="700" fill="#ffffff">ForMIX</text>
+</svg>

@@ -2,24 +2,28 @@
  * Inventory Management Module
  * Connects with the `/api/inventory` endpoints.
  */
-(function (globals) {
-  if (!globals) {
-    console.error("AppGlobals no encontrado. Asegurate de cargar app.js antes que inventory.js");
-    return;
-  }
+(function () {
+  window.FormixModules = window.FormixModules || {};
 
-  const {
-    state,
-    escapeHtml,
-    formatNum,
-    canAccessView,
-    switchView,
-    tabInventario,
-    uiDialogHost,
-    uiToastHost,
-    BRAND_LOGO_URL,
-    getFullTodayCancun
-  } = globals;
+  window.FormixModules.createInventoryModule = function createInventoryModule(ctx) {
+    const {
+      state,
+      escapeHtml,
+      formatNum,
+      canAccessView,
+      switchView,
+      tabInventario,
+      uiDialogHost,
+      brandLogoUrl,
+      brandName,
+      brandTagline,
+      plantName,
+      getTodayCancun,
+      getFullTodayCancun,
+      renderDoser,
+      uiConfirm,
+      pushToast,
+    } = ctx;
 
   // --- DOM Elements ---
   const invStatusBar = document.getElementById("invStatusBar");
@@ -37,6 +41,41 @@
   // --- State ---
   let invMaterials = [];
   let invTransactions = [];
+  let initialized = false;
+  const disposers = [];
+  const FIBRA_KG_PER_M3 = 0.30;
+
+  function on(element, eventName, handler) {
+    if (!element) return;
+    element.addEventListener(eventName, handler);
+    disposers.push(() => element.removeEventListener(eventName, handler));
+  }
+
+  function notify(message, tone = "ok") {
+    if (!message) return;
+    if (typeof pushToast === "function") {
+      pushToast(message, tone);
+      return;
+    }
+    window.alert(message);
+  }
+
+  function isFibraAlias(material) {
+    return String(material && material.doser_alias ? material.doser_alias : "")
+      .trim()
+      .toLowerCase() === "fibra";
+  }
+
+  function formatRemainingInventoryValue(material) {
+    const stock = Number(material && material.current_stock ? material.current_stock : 0);
+    const rawUnit = String(material && material.unit ? material.unit : "");
+    const unit = escapeHtml(rawUnit);
+    if (!isFibraAlias(material) || rawUnit.trim().toLowerCase() !== "kg" || FIBRA_KG_PER_M3 <= 0) {
+      return `${formatNum(stock)} <span>${unit}</span>`;
+    }
+    const equivalentM3 = stock / FIBRA_KG_PER_M3;
+    return `${formatNum(stock)} <span>${unit} / ${formatNum(equivalentM3)} m3</span>`;
+  }
 
   // --- API Fetch Wrapper (reusing auth strategy) ---
   async function invFetch(url, opts = {}) {
@@ -76,12 +115,12 @@
       renderMaterialsTab();
       renderDashboard();
       populateMaterialSelects();
-      if (AppGlobals.state && AppGlobals.state.view === "dosificador" && typeof AppGlobals.renderDosificador === "function") {
-        AppGlobals.renderDosificador();
+      if (state && state.view === "dosificador" && typeof renderDoser === "function") {
+        renderDoser();
       }
       await loadTransactions();
 
-      const isAdmin = window.AppGlobals && window.AppGlobals.state && window.AppGlobals.state.auth && window.AppGlobals.state.auth.role === "administrador";
+      const isAdmin = state && state.auth && state.auth.role === "administrador";
       const purgeBtn = document.getElementById("adminPurgeInactiveBtn");
       if (purgeBtn) purgeBtn.style.display = isAdmin ? "inline-block" : "none";
 
@@ -134,7 +173,7 @@
     if (!invMaterialsBody) return;
     invMaterialsBody.innerHTML = "";
 
-    const isAdmin = window.AppGlobals && window.AppGlobals.state && window.AppGlobals.state.auth && window.AppGlobals.state.auth.role === "administrador";
+    const isAdmin = state && state.auth && state.auth.role === "administrador";
 
     invMaterials.forEach(mat => {
       const tr = document.createElement("tr");
@@ -164,7 +203,7 @@
     invTransactionsBody.innerHTML = "";
 
     // Check if the current user is an admin
-    const isAdmin = window.AppGlobals && window.AppGlobals.state && window.AppGlobals.state.auth && window.AppGlobals.state.auth.role === "administrador";
+    const isAdmin = state && state.auth && state.auth.role === "administrador";
     const colCount = isAdmin ? 7 : 6;
 
     if (!invTransactions.length) {
@@ -210,7 +249,7 @@
       ? `¿Seguro que deseas ELIMINAR la ENTRADA de ${trx.amount} ${trx.unit} de ${trx.material_name}? Esto restará el material del stock actual.`
       : `¿Seguro que deseas ELIMINAR la SALIDA de ${trx.amount} ${trx.unit} de ${trx.material_name}? Esto sumará el material de regreso al stock.`;
 
-    const confirmed = await window.AppGlobals.uiConfirm(msg, {
+    const confirmed = await uiConfirm(msg, {
       title: "Eliminar Movimiento",
       confirmText: "Sí, Eliminar",
       tone: "err"
@@ -480,23 +519,11 @@
   }
 
   // --- Hooking the Events ---
-  if (tabInventario) {
-    tabInventario.addEventListener("click", () => {
-      if (!canAccessView("inventario")) return;
-      switchView("inventario");
-      loadInventoryData();
-    });
-  }
-
-  if (invReloadBtn) invReloadBtn.addEventListener("click", loadInventoryData);
-  if (invAddMaterialBtn) invAddMaterialBtn.addEventListener("click", () => showMaterialFormDialog(null));
-  if (invAddTransactionBtn) invAddTransactionBtn.addEventListener("click", showTransactionFormDialog);
-  if (invTrxFilter) invTrxFilter.addEventListener("change", loadTransactions);
-
   const adminPurgeInactiveBtn = document.getElementById("adminPurgeInactiveBtn");
-  if (adminPurgeInactiveBtn) {
-    adminPurgeInactiveBtn.addEventListener("click", async () => {
-      const confirmed = await window.AppGlobals.uiConfirm(
+  const clearKardexBtn = document.getElementById("clearKardexBtn");
+
+  async function handlePurgeInactiveMaterials() {
+      const confirmed = await uiConfirm(
         "¿Deseas ELIMINAR DEFINITIVAMENTE todos los materiales inactivos y su historial?\n\nEsta acción limpiará el sistema de materiales de prueba y 'fantasmas'. No afectará a tus materiales actuales activos.",
         {
           title: "Limpiar Materiales Inactivos",
@@ -518,18 +545,15 @@
         await loadTransactions();
 
         setInvStatus(`Limpieza completada: ${res.purged} materiales eliminados.`, "ok");
-        uiToastHost && uiToastHost.show(`Se eliminaron ${res.purged} materiales permanentemente.`, "ok");
+        notify(`Se eliminaron ${res.purged} materiales permanentemente.`, "ok");
       } catch (err) {
         alert(err.message);
         setInvStatus(err.message, "err");
       }
-    });
   }
 
-  const clearKardexBtn = document.getElementById("clearKardexBtn");
-  if (clearKardexBtn) {
-    clearKardexBtn.addEventListener("click", async () => {
-      const confirmed = await window.AppGlobals.uiConfirm(
+  async function handleClearKardex() {
+      const confirmed = await uiConfirm(
         "¡Peligro! ¿Estás seguro de querer ELIMINAR todo el historial de movimientos? Esta acción es irreversible, pero no afectará el stock actual de los materiales.",
         {
           title: "Limpiar Kardex",
@@ -547,15 +571,6 @@
       } catch (err) {
         alert(err.message);
       }
-    });
-  }
-
-  // Expose loadInventoryData to window so app.js can call it sequentially 
-  window.loadInventoryData = loadInventoryData;
-
-  // Load on boot to ensure state.doser.invMaterials is populated
-  if (AppGlobals.canAccessView("dosificador") || AppGlobals.canAccessView("inventario")) {
-    loadInventoryData();
   }
 
   // --- Daily Report Functions ---
@@ -563,7 +578,7 @@
     const invDailyReportDate = document.getElementById("invDailyReportDate");
     const date = invDailyReportDate ? invDailyReportDate.value : null;
     if (!date) {
-      uiToastHost && uiToastHost.show("Selecciona una fecha para el reporte.", "warn");
+      notify("Selecciona una fecha para el reporte.", "warn");
       return;
     }
 
@@ -582,7 +597,7 @@
   function openDailyReportInNewTab(summary) {
     const { production, consumption, remisiones, current_inventory, date } = summary;
     const reportDate = getFullTodayCancun ? getFullTodayCancun() : new Date().toLocaleString();
-    const logoUrl = BRAND_LOGO_URL || "";
+    const logoUrl = brandLogoUrl || "";
 
     const efficiency = production.total_teorico_kg > 0
       ? (production.total_real_kg / production.total_teorico_kg) * 100
@@ -617,7 +632,7 @@
       return `
         <div class="card ${isLow ? 'card--warn' : ''}">
           <div class="card-label">${escapeHtml(m.name)}</div>
-          <div class="card-val">${formatNum(m.current_stock)} <span>${escapeHtml(m.unit)}</span></div>
+          <div class="card-val">${formatRemainingInventoryValue(m)}</div>
         </div>
       `;
     }).join("");
@@ -673,10 +688,10 @@
   <div class="page">
     <div class="header">
       <div class="header-brand">
-        <img src="${logoUrl}" class="logo" alt="ALMEX">
+        <img src="${logoUrl}" class="logo" alt="${escapeHtml(brandName || "ForMIX")}">
         <div>
           <h1>Reporte Diario de Operaciones</h1>
-          <p>Planta Cancún | ALMEX</p>
+          <p>${escapeHtml(plantName || "Planta")} | ${escapeHtml(brandName || "ForMIX")}</p>
         </div>
       </div>
       <div style="text-align:right">
@@ -737,7 +752,7 @@
       <div class="stock-grid">${inventoryCards}</div>
     </div>
 
-    <div class="footer">ForMIX by LABSICO - Sistema de Gestión de Concreto</div>
+    <div class="footer">${escapeHtml(brandTagline || "ForMIX Pilot")} - Sistema de Gestion de Concreto</div>
   </div>
 </body>
 </html>`;
@@ -753,14 +768,43 @@
     win.document.close();
   }
 
-  if (invGenDailyReportBtn) {
-    invGenDailyReportBtn.addEventListener("click", () => {
-      generateDailyReport();
+  function init() {
+    if (initialized) return;
+    initialized = true;
+
+    on(tabInventario, "click", () => {
+      if (!canAccessView("inventario")) return;
+      switchView("inventario");
     });
+    on(invReloadBtn, "click", loadInventoryData);
+    on(invAddMaterialBtn, "click", () => showMaterialFormDialog(null));
+    on(invAddTransactionBtn, "click", showTransactionFormDialog);
+    on(invTrxFilter, "change", loadTransactions);
+    on(adminPurgeInactiveBtn, "click", handlePurgeInactiveMaterials);
+    on(clearKardexBtn, "click", handleClearKardex);
+    on(invGenDailyReportBtn, "click", generateDailyReport);
+
+    if (invDailyReportDate) {
+      invDailyReportDate.value = getTodayCancun ? getTodayCancun() : new Date().toISOString().split("T")[0];
+    }
+
+    if (canAccessView("dosificador") || canAccessView("inventario")) {
+      loadInventoryData();
+    }
   }
 
-  if (invDailyReportDate) {
-    invDailyReportDate.value = globals.getTodayCancun ? globals.getTodayCancun() : new Date().toISOString().split('T')[0];
+  function unmount() {
+    while (disposers.length) {
+      const dispose = disposers.pop();
+      if (dispose) dispose();
+    }
+    initialized = false;
   }
 
-})(window.AppGlobals);
+  return {
+    init,
+    unmount,
+    load: loadInventoryData,
+  };
+  };
+})();

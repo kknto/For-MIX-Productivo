@@ -4,8 +4,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ALMEX | Editor de Disenos de Mezclas</title>
-  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo_almex.png', v=cache_bust) }}">
+  <title>{{ instance_meta.site_title }}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename=instance_meta.logo_path, v=cache_bust) }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v=cache_bust) }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/fleet.css', v=cache_bust) }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/inventory.css', v=cache_bust) }}">
@@ -16,11 +16,11 @@
   <header class="topbar">
     <div class="topbar__left">
       <div class="topbar__brand">
-        <img class="brand-logo" src="{{ url_for('static', filename='img/logo_almex.png', v=cache_bust) }}" alt="ALMEX">
+        <img class="brand-logo" src="{{ url_for('static', filename=instance_meta.logo_path, v=cache_bust) }}" alt="{{ instance_meta.brand_name }}">
         <div>
-          <h1>Editor de Diseños de Mezclas</h1>
-          <p>Gestion operativa de formulas para planta de concreto | <span
-              style="font-weight:700; color:var(--brand);">ForMIX by LABSICO</span></p>
+          <h1>{{ instance_meta.site_title }}</h1>
+          <p>{{ instance_meta.system_subtitle }} | <span
+              style="font-weight:700; color:var(--brand);">{{ instance_meta.brand_tagline }}</span></p>
         </div>
       </div>
     </div>
@@ -45,6 +45,7 @@
     <button id="tabEditor" class="view-tab view-tab--active">Editor CSV</button>
     <button id="tabConsulta" class="view-tab">Consulta Mix</button>
     <button id="tabDosificador" class="view-tab">Dosificador</button>
+    <button id="tabRemisiones" class="view-tab">Remisiones</button>
     <button id="tabInventario" class="view-tab">Inventario</button>
     <button id="tabLaboratorio" class="view-tab">Laboratorio</button>
     <button id="tabFlotilla" class="view-tab">Flotilla</button>
@@ -385,6 +386,9 @@
           <label>No. Remision
             <input id="dRemisionNo" type="text" maxlength="40" placeholder="Ej. R-000123">
           </label>
+          <label>Fecha de la remision
+            <input id="dRemisionDate" type="date" class="form-input">
+          </label>
           <button id="dSaveRemisionBtn" class="btn btn--primary">Guardar Remision</button>
           <div style="display:inline-flex; align-items:center; gap:8px; margin-left: auto;">
             <label for="dRemisionFilterDate" style="font-size:0.85rem; color:var(--text-soft);">Filtrar por
@@ -425,9 +429,7 @@
                 <th>Ubicación</th>
                 <th>Peso Real</th>
                 <th>Fecha</th>
-                <th>Archivo</th>
-                <th>Usuario</th>
-                <th>Accion</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody id="doserRemisionBody"></tbody>
@@ -513,6 +515,68 @@
               <span id="doserRealWeight">0.00</span>
             </div>
           </article>
+        </div>
+      </section>
+    </section>
+
+    <section id="remisionesView" class="view-pane is-hidden">
+      <section class="panel panel--consulta">
+        <div class="consulta-head">
+          <h2>Historial de Remisiones</h2>
+          <p id="remisionesSummary">Consulta global de remisiones por rango de fechas, cliente, remision, formula y archivo.</p>
+        </div>
+        <div class="query-form remisiones-filter-grid">
+          <label>Fecha desde
+            <input id="rDateFrom" type="date" class="form-input">
+          </label>
+          <label>Fecha hasta
+            <input id="rDateTo" type="date" class="form-input">
+          </label>
+          <label>No. Remision
+            <input id="rRemisionNo" type="search" class="form-input" placeholder="Ej. R-00125">
+          </label>
+          <label>Cliente
+            <input id="rCliente" type="search" class="form-input" placeholder="Nombre del cliente">
+          </label>
+          <label>Formula
+            <input id="rFormula" type="search" class="form-input" placeholder="Ej. A1-250">
+          </label>
+          <label>Archivo / Dataset
+            <input id="rSourceFile" type="search" class="form-input" placeholder="Ej. bootstrap.csv">
+          </label>
+        </div>
+        <div class="query-actions">
+          <button id="rSearchBtn" class="btn btn--primary">Buscar</button>
+          <button id="rClearBtn" class="btn btn--muted">Limpiar</button>
+        </div>
+        <div id="remisionesMeta" class="meta"></div>
+      </section>
+
+      <section class="panel panel--consulta">
+        <div class="result-shell remisiones-result-shell">
+          <table id="remisionesTable">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Remision</th>
+                <th>Cliente</th>
+                <th>Ubicacion</th>
+                <th>Formula</th>
+                <th>f'c</th>
+                <th>T.M.A.</th>
+                <th>m3</th>
+                <th>Archivo</th>
+                <th>Usuario</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="remisionesBody"></tbody>
+          </table>
+        </div>
+        <div class="query-actions remisiones-pager">
+          <button id="rPrevBtn" class="btn btn--muted btn--small">Anterior</button>
+          <span id="remisionesPageInfo" class="remisiones-page-info">Pagina 1 de 1</span>
+          <button id="rNextBtn" class="btn btn--muted btn--small">Siguiente</button>
         </div>
       </section>
     </section>
@@ -930,7 +994,7 @@
         <header class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
           <div class="consulta-head" style="margin: 0;">
             <h2>Gestión de Usuarios</h2>
-            <p>Módulo de administración del sistema ALMEX</p>
+            <p>{{ instance_meta.admin_subtitle }}</p>
           </div>
           <button id="btnNewUser" class="btn btn--primary">Registrar Usuario</button>
         </header>
@@ -1102,13 +1166,34 @@
 
   <script>
     window.APP_BOOT = {{ auth_boot | tojson }};
+    window.INSTANCE_META = {{ instance_meta | tojson }};
+    window.INSTANCE_META.logo_url = "{{ url_for('static', filename=instance_meta.logo_path, v=cache_bust) }}";
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <script src="{{ url_for('static', filename='js/app.js', v=cache_bust) }}"></script>
-  <script src="{{ url_for('static', filename='js/fleet.js', v=cache_bust) }}"></script>
-  <script src="{{ url_for('static', filename='js/inventory.js', v=cache_bust) }}"></script>
-  <script src="{{ url_for('static', filename='js/qc_lab.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/editor_table.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/editor_dataset.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/editor.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/consulta_costs.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/consulta_report.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/consulta_flow.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/consulta.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/doser_params.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/doser_search.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/doser_reports.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/doser_render.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/doser.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/remisiones.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/qc_sync.js', v=cache_bust) }}"></script>
   <script src="{{ url_for('static', filename='js/users.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/inventory.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/fleet.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/qc_lab.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/shell_time.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/shell_format.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/shell_ui.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/shell_recipe_core.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/shell_dataset_core.js', v=cache_bust) }}"></script>
+  <script src="{{ url_for('static', filename='js/app.js', v=cache_bust) }}"></script>
 </body>
 
 </html>

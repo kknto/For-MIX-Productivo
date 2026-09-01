@@ -1270,7 +1270,8 @@ td.cell.cell-readonly {
 }
 
 #doserRemisionTable th:nth-child(2) {
-  width: 15%;
+  min-width: 176px;
+  width: 176px;
 }
 
 #doserRemisionTable th:nth-child(3),
@@ -1281,15 +1282,23 @@ td.cell.cell-readonly {
 }
 
 #doserRemisionTable th:nth-child(7) {
-  width: 14%;
+  min-width: 140px;
+  width: 140px;
 }
 
 #doserRemisionTable th:nth-child(8) {
-  width: 12%;
+  min-width: 120px;
+  width: 120px;
 }
 
 #doserRemisionTable th:nth-child(9) {
-  width: 16%;
+  min-width: 160px;
+  width: 160px;
+}
+
+#doserRemisionTable th:nth-child(10) {
+  min-width: 210px;
+  width: 210px;
 }
 
 #doserRecipeTable td:nth-child(2),
@@ -1362,7 +1371,70 @@ td.cell.cell-readonly {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: nowrap;
+  min-width: 210px;
+}
+
+#doserRemisionTable td:nth-child(10) {
+  min-width: 210px;
+  white-space: nowrap;
+}
+
+.remision-cell {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remision-cell--formula {
+  max-width: 176px;
+}
+
+.remision-cell--client {
+  max-width: 124px;
+}
+
+.remision-cell--location {
+  max-width: 132px;
+}
+
+.remision-cell--date {
+  max-width: 156px;
+}
+
+.remision-actions .btn {
+  white-space: nowrap;
+}
+
+.remisiones-filter-grid {
+  grid-template-columns: repeat(6, minmax(150px, 1fr));
+}
+
+.remisiones-result-shell {
+  max-height: none;
+}
+
+#remisionesView table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+#remisionesView .remision-actions {
+  display: flex;
+  gap: 6px;
   flex-wrap: wrap;
+}
+
+.remisiones-pager {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.remisiones-page-info {
+  color: var(--text-soft);
+  font-size: 0.9rem;
 }
 
 .doser-real-input,
@@ -1683,6 +1755,10 @@ td.cell.cell-readonly {
     grid-template-columns: repeat(3, minmax(140px, 1fr));
   }
 
+  .remisiones-filter-grid {
+    grid-template-columns: repeat(3, minmax(140px, 1fr));
+  }
+
   .doser-grid--top {
     grid-template-columns: 1fr;
   }
@@ -1761,6 +1837,10 @@ td.cell.cell-readonly {
   }
 
   .query-form--doser {
+    grid-template-columns: 1fr;
+  }
+
+  .remisiones-filter-grid {
     grid-template-columns: 1fr;
   }
 

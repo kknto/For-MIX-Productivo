@@ -2,8 +2,10 @@
  * Fleet Management Module
  * Split from app.js to keep concerns separate.
  */
-(function(globals) {
-  // --- Destructure shared globals from app.js ---
+(function () {
+  window.FormixModules = window.FormixModules || {};
+
+  window.FormixModules.createFleetModule = function createFleetModule(ctx) {
   const {
     state,
     escapeHtml,
@@ -15,16 +17,23 @@
     fuelVehicleSelect,
     fleetSummaryBody,
     tabFlotilla,
-    uiDialogHost,
-    uiToastHost
-  } = globals;
-
-  // --- fleet.js contents ---
+    getTodayCancun,
+    getFullTodayCancun,
+    pushToast
+  } = ctx;
 // â”€â”€ Fleet Module (Enhanced) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const fleetState = { vehicles: [], fuelRecords: [], summary: [], maintenance: [] };
 let trendChartInstance = null;
 let compareChartInstance = null;
+let initialized = false;
+const disposers = [];
+
+function on(element, eventName, handler) {
+  if (!element) return;
+  element.addEventListener(eventName, handler);
+  disposers.push(() => element.removeEventListener(eventName, handler));
+}
 
 async function fleetFetch(url, opts = {}) {
   const csrfToken = state.auth.csrfToken || "";
@@ -54,9 +63,6 @@ function loadFleetData() {
   loadFleetAlerts();
   loadMaintenance();
 }
-
-// Expose to global scope for app.js to call
-window.loadFleetData = loadFleetData;
 
 async function loadFleetKPIs() {
   try {
@@ -171,7 +177,7 @@ function renderFuelTable() {
 
 function showFuelDialog() {
   const host = document.getElementById("uiDialogHost"); if (!host) return;
-  const ds = globals.getFullTodayCancun ? globals.getFullTodayCancun() : new Date().toLocaleString();
+  const ds = getFullTodayCancun ? getFullTodayCancun() : new Date().toLocaleString();
   const vOpts = fleetState.vehicles.map(v=>`<option value="${v.id}">${esc(v.unit_number)} - ${esc(v.driver)}</option>`).join("");
   host.innerHTML = `<div class="ui-dialog-backdrop"><div class="ui-dialog" style="max-width:480px;"><h3>Registrar Carga</h3><div class="fleet-form"><label>Veh\u00edculo <select id="ffVehicle">${vOpts}</select></label><label>Fecha/Hora <input id="ffDate" type="text" value="${ds}"></label><label>Km Od\u00f3metro <input id="ffKm" type="number" min="0" value="0"></label><label>Litros <input id="ffLiters" type="number" min="0" value="0"></label><label>Costo $ <input id="ffCost" type="number" min="0" value="0"></label><label>Chofer <input id="ffDriver" type="text"></label><label>Estaci\u00f3n <input id="ffStation" type="text"></label><label>Notas <input id="ffNotes" type="text"></label></div><div class="query-actions" style="margin-top:12px;justify-content:flex-end;"><button id="ffCancel" class="btn btn--muted">Cancelar</button><button id="ffSave" class="btn btn--primary">Guardar</button></div></div></div>`;
   host.classList.remove("is-hidden"); host.setAttribute("aria-hidden","false");
@@ -219,7 +225,7 @@ function renderMaintenanceTable() {
 
 function showMaintDialog() {
   const host = document.getElementById("uiDialogHost"); if (!host) return;
-  const now = globals.getTodayCancun ? globals.getTodayCancun() : new Date().toISOString().split("T")[0];
+  const now = getTodayCancun ? getTodayCancun() : new Date().toISOString().split("T")[0];
   const vOpts = fleetState.vehicles.map(v=>`<option value="${v.id}">${esc(v.unit_number)}</option>`).join("");
   const types = ["Cambio de aceite","Filtro de aire","Filtro de diesel","Llantas","Frenos","Afinaci\u00f3n","Bater\u00eda","Otro"];
   const tOpts = types.map(t=>`<option value="${t}">${t}</option>`).join("");
@@ -282,28 +288,59 @@ function exportFleetReport() {
 }
 
 function showToast(msg, type) {
-  const host=document.getElementById("uiToastHost"); if(!host) return;
-  const t=document.createElement("div"); t.className="ui-toast"; t.style.borderLeftColor=type==="ok"?"#28a745":type==="error"?"#dc3545":"#17a2b8"; t.textContent=msg; host.appendChild(t); setTimeout(()=>t.remove(),4000);
+  const tone = type === "error" ? "err" : type === "ok" ? "ok" : "warn";
+  if (typeof pushToast === "function") {
+    pushToast(msg, tone);
+    return;
+  }
+  const host = document.getElementById("uiToastHost");
+  if (!host) return;
+  const t = document.createElement("div");
+  t.className = "ui-toast";
+  t.style.borderLeftColor = type === "ok" ? "#28a745" : type === "error" ? "#dc3545" : "#17a2b8";
+  t.textContent = msg;
+  host.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
 }
 
-// Event listeners
 const addVehicleBtn=document.getElementById("addVehicleBtn"), addFuelBtn=document.getElementById("addFuelBtn");
 const addMaintBtn=document.getElementById("addMaintBtn"), refreshSummaryBtn=document.getElementById("refreshSummaryBtn");
 const exportFleetBtn=document.getElementById("exportFleetBtn");
-if(addVehicleBtn) addVehicleBtn.addEventListener("click",()=>showVehicleDialog(null));
-if(addFuelBtn) addFuelBtn.addEventListener("click",showFuelDialog);
-if(addMaintBtn) addMaintBtn.addEventListener("click",showMaintDialog);
-if(refreshSummaryBtn) refreshSummaryBtn.addEventListener("click",()=>{loadFleetSummary();loadFleetKPIs();});
-if(exportFleetBtn) exportFleetBtn.addEventListener("click",exportFleetReport);
-if(fuelVehicleSelect) fuelVehicleSelect.addEventListener("change",loadFuelRecords);
 const fuelDateFrom=document.getElementById("fuelDateFrom"),fuelDateTo=document.getElementById("fuelDateTo");
-if(fuelDateFrom) fuelDateFrom.addEventListener("change",loadFuelRecords);
-if(fuelDateTo) fuelDateTo.addEventListener("change",loadFuelRecords);
 const trendVehicleSelect=document.getElementById("trendVehicleSelect");
-if(trendVehicleSelect) trendVehicleSelect.addEventListener("change",loadTrendChart);
 const maintVehicleSelect=document.getElementById("maintVehicleSelect");
-if(maintVehicleSelect) maintVehicleSelect.addEventListener("change",loadMaintenance);
-if(tabFlotilla) tabFlotilla.addEventListener("click",()=>switchView("flotilla"));
 
+function init() {
+  if (initialized) return;
+  initialized = true;
+  on(addVehicleBtn, "click", () => showVehicleDialog(null));
+  on(addFuelBtn, "click", showFuelDialog);
+  on(addMaintBtn, "click", showMaintDialog);
+  on(refreshSummaryBtn, "click", () => { loadFleetSummary(); loadFleetKPIs(); });
+  on(exportFleetBtn, "click", exportFleetReport);
+  on(fuelVehicleSelect, "change", loadFuelRecords);
+  on(fuelDateFrom, "change", loadFuelRecords);
+  on(fuelDateTo, "change", loadFuelRecords);
+  on(trendVehicleSelect, "change", loadTrendChart);
+  on(maintVehicleSelect, "change", loadMaintenance);
+  on(tabFlotilla, "click", () => {
+    if (!canAccessView("flotilla")) return;
+    switchView("flotilla");
+  });
+}
 
-})(window.AppGlobals);
+function unmount() {
+  while (disposers.length) {
+    const dispose = disposers.pop();
+    if (dispose) dispose();
+  }
+  initialized = false;
+}
+
+return {
+  init,
+  unmount,
+  load: loadFleetData,
+};
+  };
+})();

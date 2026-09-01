@@ -1,0 +1,37 @@
+[instance]
+brand_name = "ForMIX"
+product_name = "ForMIX"
+plant_name = "Planta Base"
+municipality = "Municipio Base"
+timezone = "America/Cancun"
+site_title = "ForMIX | Control de Planta"
+login_title = "Acceso - ForMIX"
+logo_path = "img/logo_formix.svg"
+brand_tagline = "ForMIX Pilot"
+system_subtitle = "Sistema base para control operativo de planta de concreto"
+admin_subtitle = "Modulo de administracion parametrizable"
+database_mode = "auto"
+
+[paths]
+sqlite_db_path = "mix_data.sqlite3"
+snapshot_dir = "backups/db_snapshots"
+qc_uploads_dir = "static/uploads/qc_images"
+
+[limits]
+max_upload_bytes = 10485760
+max_rows = 100000
+max_columns = 400
+
+[security]
+session_cookie_secure = false
+allow_default_users = true
+
+[features]
+editor = true
+consulta = true
+dosificador = true
+remisiones = true
+inventario = true
+laboratorio = true
+flotilla = true
+usuarios = true

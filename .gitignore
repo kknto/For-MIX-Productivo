@@ -7,6 +7,11 @@ env/
 venv/
 ENV/
 .app_secret_key
+*.db
+*.sqlite3
+*.sqlite3-*
 mix_data.sqlite3*
 backups/
-.app_secret_key
+instance.toml
+.tmp_smoke/
+archive/

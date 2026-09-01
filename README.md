@@ -23,6 +23,23 @@ Abrir en navegador:
 http://127.0.0.1:8080
 ```
 
+## Configuracion por instancia
+
+- Copia `instance.example.toml` a `instance.toml` para parametrizar branding, planta, rutas y limites.
+- `instance.toml` esta ignorado por git para que cada instalacion mantenga su propia identidad.
+- Variables de entorno prioritarias:
+  - `APP_SECRET_KEY`
+  - `DATABASE_URL`
+  - `SESSION_COOKIE_SECURE`
+  - `APP_TIMEZONE`
+- `FORMIX_ALLOW_DEFAULT_USERS`
+
+Documentacion complementaria:
+
+- `ARCHITECTURE.md`: mapa actual del sistema y modulos
+- `INSTALL_INSTANCE.md`: pasos para replicar una planta nueva
+- `PREPRODUCTIVO_RENDER.md`: despliegue pre-productivo en Render con PostgreSQL
+
 ## Persistencia
 
 - La informacion se guarda en SQLite (`mix_data.sqlite3`) y no depende de escribir directo al CSV.
@@ -57,6 +74,26 @@ http://127.0.0.1:8080
 - `dosificador / Dosi#2026!`
 - `presupuestador / Presu#2026!`
 - Recomendado: cambiar credenciales iniciales en despliegue productivo.
+- Si `DATABASE_URL` esta definido, por defecto la app ya no inserta usuarios iniciales salvo que
+  `FORMIX_ALLOW_DEFAULT_USERS=1`.
+
+## Validacion rapida
+
+```bash
+py smoke_validation.py
+```
+
+- Actualmente cubre sesion, permisos, uploads `preview/commit`, historial, backups, remisiones,
+  inventario, flotilla, laboratorio y feature toggles.
+
+## Verificacion de instalacion
+
+```bash
+py verify_instance.py
+```
+
+- Valida `instance.toml`, secretos, modo de base de datos, rutas principales y features habilitados.
+- Util para preparar una nueva instalacion por planta antes del primer arranque.
 
 ## Funcionalidades
 

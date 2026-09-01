@@ -1,6 +1,17 @@
+(function () {
+    window.FormixModules = window.FormixModules || {};
+
+    window.FormixModules.createQcLabModule = function createQcLabModule(ctx) {
 let stateQcCylinders = [];
 let sampleAges = [3, 7, 14, 28]; // Default ages for a native sample
 let currentTestCylinderId = null;
+let initialized = false;
+const {
+    state,
+    apiFetch,
+    setStatus,
+    getTodayCancun
+} = ctx;
 
 async function lookupRemision() {
     const remNo = document.getElementById("qcRemisionNo").value.trim();
@@ -92,7 +103,7 @@ function renderQcDashboard() {
     let overdue = 0;
     let totalPending = 0;
 
-    const todayStr = (window.AppGlobals && window.AppGlobals.getTodayCancun) ? window.AppGlobals.getTodayCancun() : new Date().toISOString().split("T")[0];
+    const todayStr = getTodayCancun ? getTodayCancun() : new Date().toISOString().split("T")[0];
 
     stateQcCylinders.forEach(cyl => {
         if (cyl.status === "pendiente") {
@@ -290,12 +301,12 @@ function renderAgesBadges() {
     });
 }
 
-window.removeQcAge = function (index) {
+function removeQcAge(index) {
     sampleAges.splice(index, 1);
     renderAgesBadges();
 }
 
-window.editQcSample = function (sampleId) {
+function editQcSample(sampleId) {
     const userRole = (window.APP_BOOT && window.APP_BOOT.role) ? window.APP_BOOT.role.toLowerCase() : "";
     if (userRole !== "administrador" && userRole !== "laboratorista") {
         if (typeof setStatus === 'function') setStatus("No tienes permisos para editar muestras.", 'err');
@@ -323,7 +334,7 @@ window.editQcSample = function (sampleId) {
     if (form) form.scrollIntoView({ behavior: 'smooth' });
 }
 
-window.cancelQcEdit = function () {
+function cancelQcEdit() {
     document.getElementById("qcSampleId").value = "";
     const form = document.getElementById("addQcSampleForm");
     if (form) form.reset();
@@ -333,7 +344,7 @@ window.cancelQcEdit = function () {
     document.getElementById("qcCancelEditBtn").classList.add("is-hidden");
 }
 
-window.deleteQcSample = async function (sampleId) {
+async function deleteQcSample(sampleId) {
     const userRole = (window.APP_BOOT && window.APP_BOOT.role) ? window.APP_BOOT.role.toLowerCase() : "";
     if (userRole !== "administrador" && userRole !== "laboratorista") {
         if (typeof setStatus === 'function') setStatus("No tienes permisos para eliminar muestras.", 'err');
@@ -401,7 +412,7 @@ function setupListeners() {
                 if (!data.ok) throw new Error(data.error || "Error del servidor al guardar muestra");
 
                 if (typeof setStatus === 'function') setStatus("Muestra guardada correctamente.", 'ok');
-                window.cancelQcEdit();
+                cancelQcEdit();
                 // Reset to defaults
                 sampleAges = [3, 7, 14, 28];
                 renderAgesBadges();
@@ -448,7 +459,7 @@ function setupListeners() {
             const formData = new FormData(testCylinderForm);
             formData.set("strength_kgcm2", document.getElementById("testStrength").value);
             formData.set("notes", document.getElementById("testNotes").value);
-            formData.append("break_date", (window.AppGlobals && window.AppGlobals.getTodayCancun) ? window.AppGlobals.getTodayCancun() : new Date().toISOString().split("T")[0]);
+            formData.append("break_date", getTodayCancun ? getTodayCancun() : new Date().toISOString().split("T")[0]);
             formData.append("status", "ensayado");
             formData.append("failure_type", document.getElementById("testFailureType").value);
 
@@ -484,7 +495,7 @@ function setupListeners() {
     }
 }
 
-window.openTestModal = function (cylinderId, sampleCode, isEdit = false) {
+function openTestModal(cylinderId, sampleCode, isEdit = false) {
     const testCylinderModal = document.getElementById("testCylinderModal");
     const testCylinderForm = document.getElementById("testCylinderForm");
     const compressPreviewImg = document.getElementById("compressPreviewImg");
@@ -515,7 +526,7 @@ window.openTestModal = function (cylinderId, sampleCode, isEdit = false) {
     }
 }
 
-window.applyCalculatedStrength = function() {
+function applyCalculatedStrength() {
     const load = parseFloat(document.getElementById("calcLoad").value);
     const diameter = parseFloat(document.getElementById("calcDiameter").value);
     const factor = parseFloat(document.getElementById("calcFactor").value) || 1.0;
@@ -545,7 +556,7 @@ window.applyCalculatedStrength = function() {
     if (typeof setStatus === 'function') setStatus(msg, 'ok');
 }
 
-window.closeTestModal = function () {
+function closeTestModal() {
     const testCylinderModal = document.getElementById("testCylinderModal");
     if (testCylinderModal) {
         testCylinderModal.classList.add("is-hidden");
@@ -555,7 +566,7 @@ window.closeTestModal = function () {
     currentCompressedFile = null;
 }
 
-window.openChartModal = async function (sampleId, sampleCode) {
+async function openChartModal(sampleId, sampleCode) {
     const modal = document.getElementById("qcChartModal");
     if (!modal) return;
 
@@ -566,7 +577,7 @@ window.openChartModal = async function (sampleId, sampleCode) {
     renderEvolutionChart(sampleId);
 }
 
-window.closeChartModal = function () {
+function closeChartModal() {
     const modal = document.getElementById("qcChartModal");
     if (modal) {
         modal.classList.add("is-hidden");
@@ -719,17 +730,32 @@ let trendLineChart = null;
 
 // Trend Analysis is now standalone at /api/qclab/reports/trends
 
-window.loadQcLabData = loadLaboratoryData;
-window.initQcLab = initQcLab;
+function init() {
+    if (initialized) return;
+    initialized = true;
 
-// Trigger listeners setup
-setupListeners();
+    window.removeQcAge = removeQcAge;
+    window.editQcSample = editQcSample;
+    window.cancelQcEdit = cancelQcEdit;
+    window.deleteQcSample = deleteQcSample;
+    window.openTestModal = openTestModal;
+    window.applyCalculatedStrength = applyCalculatedStrength;
+    window.closeTestModal = closeTestModal;
+    window.openChartModal = openChartModal;
+    window.closeChartModal = closeChartModal;
 
-// Auto-init on script load if the view is already active
-const labView = document.getElementById("laboratorioView");
-if (labView && !labView.classList.contains("is-hidden")) {
-    initQcLab();
-    loadLaboratoryData();
-} else {
+    setupListeners();
     initQcLab();
 }
+
+function unmount() {
+    initialized = false;
+}
+
+return {
+    init,
+    unmount,
+    load: loadLaboratoryData,
+};
+    };
+})();
