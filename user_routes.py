@@ -1,5 +1,7 @@
 from flask import Blueprint, jsonify, request
 
+from http_security import api_error_response
+
 from repositories.users_repository import UsersRepository
 from services.users_service import UsersService
 
@@ -14,7 +16,7 @@ def register_user_routes(app_store, require_roles):
         try:
             return jsonify(users_service.list_users())
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 500
+            return api_error_response(exc, 500)
 
     @users_bp.route("", methods=["POST"])
     @require_roles("administrador")
@@ -23,7 +25,7 @@ def register_user_routes(app_store, require_roles):
             payload = request.get_json() or {}
             return jsonify(users_service.save_user(payload))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @users_bp.route("/<int:user_id>", methods=["DELETE"])
     @require_roles("administrador")
@@ -31,9 +33,9 @@ def register_user_routes(app_store, require_roles):
         try:
             return jsonify(users_service.delete_user(user_id))
         except FileNotFoundError as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 404
+            return api_error_response(exc, 404)
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 500
+            return api_error_response(exc, 500)
 
     @users_bp.route("/<int:user_id>/reset_password", methods=["POST"])
     @require_roles("administrador")
@@ -42,8 +44,8 @@ def register_user_routes(app_store, require_roles):
             payload = request.get_json() or {}
             return jsonify(users_service.reset_password(user_id, payload.get("new_password")))
         except FileNotFoundError as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 404
+            return api_error_response(exc, 404)
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     return users_bp

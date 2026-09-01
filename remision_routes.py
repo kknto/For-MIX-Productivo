@@ -2,6 +2,7 @@ from flask import jsonify, request
 
 from core.payloads import decode_json_payload
 from core.rbac import DOSIFICADOR_ROLES, REMISIONES_ROLES, REMISION_DELETE_ROLES
+from http_security import api_error_response
 from repositories.doser_repository import DoserRepository
 from services.doser_service import DoserService
 
@@ -31,7 +32,7 @@ def register_remision_routes(app, store, require_roles):
                 )
             )
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @app.post("/api/remisiones/save")
     @require_roles(*DOSIFICADOR_ROLES)
@@ -43,7 +44,7 @@ def register_remision_routes(app, store, require_roles):
                 return jsonify({"ok": False, "error": "file must be string."}), 400
             return jsonify(doser_service.save_remision(payload=payload, actor=request.current_user["username"]))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @app.get("/api/remisiones/<int:remision_id>")
     @require_roles(*REMISIONES_ROLES)
@@ -52,7 +53,7 @@ def register_remision_routes(app, store, require_roles):
         try:
             return jsonify(doser_service.get_remision(remision_id=remision_id, file_name=file_name))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @app.delete("/api/remisiones/<int:remision_id>")
     @require_roles(*REMISION_DELETE_ROLES)
@@ -67,9 +68,9 @@ def register_remision_routes(app, store, require_roles):
                 )
             )
         except FileNotFoundError as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 404
+            return api_error_response(exc, 404)
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @app.put("/api/remisiones/<int:remision_id>")
     @require_roles("administrador")
@@ -86,4 +87,4 @@ def register_remision_routes(app, store, require_roles):
                 )
             )
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)

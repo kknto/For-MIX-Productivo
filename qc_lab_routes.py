@@ -2,10 +2,47 @@ import os
 import uuid
 
 from flask import Blueprint, Response, current_app, jsonify, render_template, request
+from werkzeug.utils import secure_filename
 
 from core.rbac import LABORATORIO_ROLES, QC_LAB_WRITE_ROLES
+from http_security import api_error_response
 from repositories.qc_lab_repository import QcLabRepository
 from services.qc_lab_service import QcLabService
+
+
+ALLOWED_IMAGE_MIME = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+
+
+def read_validated_qc_image(file, max_bytes: int):
+    if not file or not file.filename:
+        return "", None
+
+    filename = secure_filename(file.filename)
+    ext = os.path.splitext(filename)[1].lower()
+    mimetype = (file.mimetype or "").lower()
+
+    if mimetype not in ALLOWED_IMAGE_MIME or ext not in ALLOWED_IMAGE_EXTENSIONS:
+        raise ValueError("Formato de imagen no permitido. Use JPG, PNG o WEBP.")
+
+    raw = file.stream.read(max_bytes + 1)
+    if len(raw) > max_bytes:
+        raise ValueError("La imagen excede el tamano maximo permitido.")
+    if not raw:
+        raise ValueError("La imagen esta vacia.")
+
+    if mimetype == "image/jpeg" and not raw.startswith(b"\xff\xd8\xff"):
+        raise ValueError("Imagen JPG invalida.")
+    if mimetype == "image/png" and not raw.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise ValueError("Imagen PNG invalida.")
+    if mimetype == "image/webp" and not (raw.startswith(b"RIFF") and raw[8:12] == b"WEBP"):
+        raise ValueError("Imagen WEBP invalida.")
+
+    return ext, raw
 
 
 def register_qc_lab_routes(app, store, login_required, require_roles):
@@ -22,7 +59,7 @@ def register_qc_lab_routes(app, store, login_required, require_roles):
         try:
             return jsonify(qc_lab_service.list_samples(limit=limit))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 500
+            return api_error_response(exc, 500)
 
     @qc_bp.route("/samples/<int:sample_id>", methods=["GET"])
     @require_roles(*LABORATORIO_ROLES)
@@ -30,9 +67,9 @@ def register_qc_lab_routes(app, store, login_required, require_roles):
         try:
             return jsonify(qc_lab_service.get_sample(sample_id))
         except FileNotFoundError as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 404
+            return api_error_response(exc, 404)
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 500
+            return api_error_response(exc, 500)
 
     @qc_bp.route("/samples/<int:sample_id>", methods=["DELETE"])
     @require_roles(*QC_LAB_WRITE_ROLES)
@@ -40,9 +77,9 @@ def register_qc_lab_routes(app, store, login_required, require_roles):
         try:
             return jsonify(qc_lab_service.delete_sample(sample_id))
         except FileNotFoundError as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 404
+            return api_error_response(exc, 404)
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 500
+            return api_error_response(exc, 500)
 
     @qc_bp.route("/lookup_remision/<remision_no>", methods=["GET"])
     @require_roles(*LABORATORIO_ROLES)
@@ -50,9 +87,9 @@ def register_qc_lab_routes(app, store, login_required, require_roles):
         try:
             return jsonify(qc_lab_service.lookup_remision(remision_no))
         except FileNotFoundError as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 404
+            return api_error_response(exc, 404)
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 500
+            return api_error_response(exc, 500)
 
     @qc_bp.route("/samples", methods=["POST"])
     @require_roles(*QC_LAB_WRITE_ROLES)
@@ -61,7 +98,7 @@ def register_qc_lab_routes(app, store, login_required, require_roles):
         try:
             return jsonify(qc_lab_service.save_sample(payload, request.current_user["username"]))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 500
+            return api_error_response(exc, 500)
 
     @qc_bp.route("/cylinders", methods=["GET"])
     @require_roles(*LABORATORIO_ROLES)
@@ -71,34 +108,32 @@ def register_qc_lab_routes(app, store, login_required, require_roles):
         try:
             return jsonify(qc_lab_service.list_cylinders(pending_only=pending_only, limit=limit))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 500
+            return api_error_response(exc, 500)
 
     @qc_bp.route("/cylinders/<int:cylinder_id>/test", methods=["POST"])
     @require_roles(*QC_LAB_WRITE_ROLES)
     def api_save_cylinder_test(cylinder_id):
-        file = request.files.get("image")
-        image_path = ""
-        image_data = None
-
-        if file and file.filename:
-            uploads_dir = app.config.get("QC_UPLOADS_DIR") or os.path.join(
-                app.config.get("BASE_DIR", "."),
-                "static",
-                "uploads",
-                "qc_images",
-            )
-            os.makedirs(uploads_dir, exist_ok=True)
-
-            ext = os.path.splitext(file.filename)[1]
-            unique_name = f"{uuid.uuid4().hex}{ext}"
-            full_path = os.path.join(uploads_dir, unique_name)
-
-            image_data = file.read()
-            file.seek(0)
-            file.save(full_path)
-            image_path = f"/static/uploads/qc_images/{unique_name}"
-
         try:
+            file = request.files.get("image")
+            image_path = ""
+            image_data = None
+
+            if file and file.filename:
+                ext, image_data = read_validated_qc_image(file, int(app.config["MAX_CONTENT_LENGTH"]))
+                if not store.is_postgres:
+                    uploads_dir = app.config.get("QC_UPLOADS_DIR") or os.path.join(
+                        app.config.get("BASE_DIR", "."),
+                        "static",
+                        "uploads",
+                        "qc_images",
+                    )
+                    os.makedirs(uploads_dir, exist_ok=True)
+                    unique_name = f"{uuid.uuid4().hex}{ext}"
+                    full_path = os.path.join(uploads_dir, unique_name)
+                    with open(full_path, "wb") as file_handle:
+                        file_handle.write(image_data)
+                    image_path = f"/static/uploads/qc_images/{unique_name}"
+
             payload = request.form.to_dict()
             return jsonify(
                 qc_lab_service.test_cylinder(
@@ -109,7 +144,7 @@ def register_qc_lab_routes(app, store, login_required, require_roles):
                 )
             )
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 500
+            return api_error_response(exc, 500)
 
     @qc_bp.route("/cylinders/<int:cylinder_id>/image", methods=["GET"])
     @require_roles(*LABORATORIO_ROLES)
@@ -137,7 +172,7 @@ def register_qc_lab_routes(app, store, login_required, require_roles):
 
                 return jsonify({"ok": False, "error": "Imagen no encontrada"}), 404
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 500
+            return api_error_response(exc, 500)
 
     @qc_bp.route("/stats/trends", methods=["GET"])
     @require_roles(*LABORATORIO_ROLES)
@@ -171,7 +206,7 @@ def register_qc_lab_routes(app, store, login_required, require_roles):
 
             return jsonify({"ok": True, "data": tested})
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 500
+            return api_error_response(exc, 500)
 
     @qc_bp.route("/reports/trends", methods=["GET"])
     @require_roles(*LABORATORIO_ROLES)

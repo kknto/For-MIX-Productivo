@@ -2,6 +2,7 @@ from flask import jsonify, request
 
 from core.errors import ConcurrencyError
 from core.rbac import EDITOR_ROLES, ROLE_ALLOWED_VIEWS
+from http_security import api_error_response
 from repositories.editor_repository import EditorRepository
 from services.editor_service import EditorService, MODES
 
@@ -20,7 +21,7 @@ def register_editor_routes(app, store, require_roles):
         try:
             return jsonify(editor_service.families_summary())
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @app.post("/api/select")
     @require_roles(*ROLE_ALLOWED_VIEWS.keys())
@@ -32,7 +33,7 @@ def register_editor_routes(app, store, require_roles):
         try:
             return jsonify(editor_service.select_file(file_name))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @app.post("/api/upload/preview")
     @require_roles(*EDITOR_ROLES)
@@ -43,7 +44,7 @@ def register_editor_routes(app, store, require_roles):
             out = editor_service.upload_preview(request.files["file"])
             return jsonify(out), (200 if out["ok"] else 400)
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @app.post("/api/upload/commit")
     @require_roles(*EDITOR_ROLES)
@@ -70,7 +71,7 @@ def register_editor_routes(app, store, require_roles):
                 actor=request.current_user["username"],
             ))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @app.post("/api/upload")
     @require_roles(*EDITOR_ROLES)
@@ -81,7 +82,7 @@ def register_editor_routes(app, store, require_roles):
             out = editor_service.upload_legacy(request.files["file"], actor=request.current_user["username"])
             return jsonify(out), (200 if out["ok"] else 400)
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @app.post("/api/purge_deleted")
     @require_roles("administrador")
@@ -89,7 +90,7 @@ def register_editor_routes(app, store, require_roles):
         try:
             return jsonify(editor_service.purge_deleted(actor=request.current_user["username"]))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @app.post("/api/delete")
     @require_roles(*EDITOR_ROLES)
@@ -101,7 +102,7 @@ def register_editor_routes(app, store, require_roles):
         try:
             return jsonify(editor_service.delete_dataset(file_name, actor=request.current_user["username"]))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @app.post("/api/family")
     @require_roles(*EDITOR_ROLES)
@@ -120,7 +121,7 @@ def register_editor_routes(app, store, require_roles):
                 actor=request.current_user["username"],
             ))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @app.post("/api/save")
     @require_roles(*EDITOR_ROLES)
@@ -128,9 +129,9 @@ def register_editor_routes(app, store, require_roles):
         try:
             return jsonify(editor_service.save_dataset(request.get_data(cache=False), actor=request.current_user["username"]))
         except ConcurrencyError as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 409
+            return api_error_response(exc, 409)
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @app.get("/api/history")
     @require_roles(*EDITOR_ROLES)
@@ -139,7 +140,7 @@ def register_editor_routes(app, store, require_roles):
         try:
             return jsonify(editor_service.history(file_name=file_name, limit=50))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @app.post("/api/history/restore")
     @require_roles(*EDITOR_ROLES)
@@ -163,9 +164,9 @@ def register_editor_routes(app, store, require_roles):
                 )
             )
         except ConcurrencyError as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 409
+            return api_error_response(exc, 409)
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @app.get("/api/audit")
     @require_roles(*EDITOR_ROLES)
@@ -175,7 +176,7 @@ def register_editor_routes(app, store, require_roles):
         try:
             return jsonify(editor_service.audit(file_name=file_name, limit=int(limit)))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @app.get("/api/backups")
     @require_roles(*EDITOR_ROLES)
@@ -184,7 +185,7 @@ def register_editor_routes(app, store, require_roles):
         try:
             return jsonify(editor_service.backups(limit=int(limit)))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @app.post("/api/backups/create")
     @require_roles(*EDITOR_ROLES)
@@ -196,7 +197,7 @@ def register_editor_routes(app, store, require_roles):
         try:
             return jsonify(editor_service.create_backup(reason=reason or "manual", actor=request.current_user["username"]))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @app.post("/api/backups/restore")
     @require_roles("administrador")
@@ -208,6 +209,6 @@ def register_editor_routes(app, store, require_roles):
         try:
             return jsonify(editor_service.restore_backup(backup_file=backup_file, actor=request.current_user["username"]))
         except FileNotFoundError as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 404
+            return api_error_response(exc, 404)
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)

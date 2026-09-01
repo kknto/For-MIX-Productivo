@@ -1,4 +1,4 @@
-from flask import jsonify, redirect, render_template, request, session, url_for
+from flask import current_app, g, jsonify, redirect, render_template, request, session, url_for
 
 from core.rbac import EDITOR_ROLES, QC_HUMIDITY_ROLES
 from core.time import get_now, now_str
@@ -37,8 +37,22 @@ def register_auth_routes(
             return redirect(url_for("index"))
         except PermissionError as exc:
             return render_template("login.html", error=str(exc), cache_bust=int(get_now().timestamp())), 429
+        except ValueError:
+            return render_template(
+                "login.html",
+                error="Credenciales invalidas.",
+                cache_bust=int(get_now().timestamp()),
+            ), 401
         except Exception as exc:
-            return render_template("login.html", error=str(exc), cache_bust=int(get_now().timestamp())), 401
+            current_app.logger.exception(
+                "auth.login_failed_internal",
+                extra={"request_id": getattr(g, "request_id", ""), "status": 500},
+            )
+            return render_template(
+                "login.html",
+                error="No se pudo procesar el inicio de sesion.",
+                cache_bust=int(get_now().timestamp()),
+            ), 500
 
     @app.get("/change-password")
     @login_required
@@ -78,9 +92,16 @@ def register_auth_routes(
         except PermissionError as exc:
             code = 403
             msg = str(exc)
-        except Exception as exc:
+        except ValueError as exc:
             code = 400
             msg = str(exc)
+        except Exception:
+            current_app.logger.exception(
+                "auth.change_password_failed_internal",
+                extra={"request_id": getattr(g, "request_id", ""), "status": 500},
+            )
+            code = 500
+            msg = "No se pudo cambiar la contrasena."
         return render_template(
             "change_password.html",
             error=msg,

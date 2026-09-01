@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from core.rbac import roles_for_view
+from http_security import api_error_response
 from repositories.inventory_repository import InventoryRepository
 from services.inventory_service import InventoryService
 
@@ -24,7 +25,7 @@ def register_inventory_routes(app, store, login_required, require_roles=None):
         try:
             return jsonify(inventory_service.save_material(data, actor=request.current_user["username"]))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @inv_bp.route("/materials/<int:material_id>", methods=["DELETE"])
     @require_roles(*roles_for_view("inventario"))
@@ -52,7 +53,7 @@ def register_inventory_routes(app, store, login_required, require_roles=None):
         try:
             return jsonify(inventory_service.purge_inactive())
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @inv_bp.route("/transactions", methods=["GET"])
     @require_roles(*roles_for_view("inventario"))
@@ -68,7 +69,7 @@ def register_inventory_routes(app, store, login_required, require_roles=None):
         try:
             return jsonify(inventory_service.save_transaction(data, actor=request.current_user["username"]))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @inv_bp.route("/transactions/<int:transaction_id>", methods=["DELETE"])
     @require_roles(*roles_for_view("inventario"))
@@ -79,7 +80,7 @@ def register_inventory_routes(app, store, login_required, require_roles=None):
         try:
             return jsonify(inventory_service.delete_transaction(transaction_id, actor=request.current_user["username"]))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @inv_bp.route("/transactions", methods=["DELETE"])
     @require_roles(*roles_for_view("inventario"))
@@ -90,7 +91,7 @@ def register_inventory_routes(app, store, login_required, require_roles=None):
         try:
             return jsonify(inventory_service.clear_transactions())
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @inv_bp.route("/daily_summary", methods=["GET"])
     @require_roles(*roles_for_view("inventario"))
@@ -101,6 +102,6 @@ def register_inventory_routes(app, store, login_required, require_roles=None):
         try:
             return jsonify(inventory_service.daily_summary(date_str))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     app.register_blueprint(inv_bp)

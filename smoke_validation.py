@@ -97,6 +97,46 @@ class SmokeValidationTests(unittest.TestCase):
                 json_payload = {**payload, "_csrf_token": csrf}
         return self.client.open(path, method=method, json=json_payload, headers=headers)
 
+    def test_security_handlers_sanitize_errors_and_trace_requests(self):
+        self.app.config["PROPAGATE_EXCEPTIONS"] = False
+
+        @self.app.get("/api/_smoke/private_error")
+        def _smoke_private_error():
+            raise RuntimeError("postgres://secret")
+
+        @self.app.get("/api/_smoke/value_error")
+        def _smoke_value_error():
+            raise ValueError("Campo requerido")
+
+        response = self.client.get("/login")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.headers.get("X-Request-ID"))
+        self.assertEqual(response.headers.get("X-Content-Type-Options"), "nosniff")
+        self.assertEqual(response.headers.get("X-Frame-Options"), "DENY")
+
+        private_resp = self.client.get("/api/_smoke/private_error")
+        self.assertEqual(private_resp.status_code, 500)
+        private_payload = private_resp.get_json()
+        self.assertFalse(private_payload["ok"])
+        self.assertEqual(private_payload["error"], "Error interno del servidor.")
+        self.assertTrue(private_payload["request_id"])
+        self.assertNotIn("postgres://secret", private_resp.get_data(as_text=True))
+
+        value_resp = self.client.get("/api/_smoke/value_error")
+        self.assertEqual(value_resp.status_code, 400)
+        value_payload = value_resp.get_json()
+        self.assertFalse(value_payload["ok"])
+        self.assertEqual(value_payload["error"], "Campo requerido")
+        self.assertTrue(value_payload["request_id"])
+
+        origin_resp = self.client.post(
+            "/login",
+            data={"username": "admin", "password": "Admin#2026!X"},
+            headers={"Origin": "https://evil.example"},
+        )
+        self.assertEqual(origin_resp.status_code, 403)
+        self.assertEqual(origin_resp.get_json()["error"], "Origen no autorizado.")
+
     def _build_remision_snapshot(self, material_id: int, *, real_weight: float = 250.0):
         return {
             "formula": "A1",
@@ -691,7 +731,7 @@ class SmokeValidationTests(unittest.TestCase):
         self.assertTrue(delete_resp.get_json()["ok"])
 
         missing_resp = self.client.get(f"/api/remisiones/{remision_id}")
-        self.assertEqual(missing_resp.status_code, 400)
+        self.assertEqual(missing_resp.status_code, 404)
 
     def test_remision_save_rejects_invalid_and_future_dates(self):
         self._login("admin", "Admin#2026!X")
@@ -1102,6 +1142,21 @@ class SmokeValidationTests(unittest.TestCase):
         self.assertTrue(sample_payload["ok"])
         sample = sample_payload["sample"]
         cylinder_id = sample["cylinders"][0]["id"]
+
+        invalid_upload_resp = self.client.post(
+            f"/api/qclab/cylinders/{cylinder_id}/test",
+            data={
+                "status": "ensayado",
+                "strength_kgcm2": "285.5",
+                "break_date": f"{today} 09:00:00",
+                "notes": "resultado smoke",
+                "_csrf_token": self._csrf_token(),
+                "image": (io.BytesIO(b"not an image"), "evidence.txt"),
+            },
+            content_type="multipart/form-data",
+        )
+        self.assertEqual(invalid_upload_resp.status_code, 400)
+        self.assertIn("Formato de imagen no permitido", invalid_upload_resp.get_json()["error"])
 
         test_resp = self.client.post(
             f"/api/qclab/cylinders/{cylinder_id}/test",

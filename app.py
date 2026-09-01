@@ -16,6 +16,7 @@ from dataset_store import DatasetStoreMixin
 from http_security import configure_http_security
 from core.config import load_instance_settings
 from core.dataset_ops import configure_dataset_limits
+from core.observability import configure_logging, install_request_logging
 from core.rbac import (
     allowed_views,
 )
@@ -111,6 +112,8 @@ def create_app(base_dir: Path, csv_file: str | None = None) -> Flask:
     configure_dataset_limits(max_rows=settings.max_rows, max_columns=settings.max_columns)
 
     app = Flask(__name__)
+    configure_logging(app)
+    install_request_logging(app)
     app.config["JSON_AS_ASCII"] = False
     app.config["TEMPLATES_AUTO_RELOAD"] = True
     app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
@@ -122,6 +125,7 @@ def create_app(base_dir: Path, csv_file: str | None = None) -> Flask:
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["SESSION_COOKIE_SECURE"] = settings.session_cookie_secure
+    app.config["MAX_CONTENT_LENGTH"] = settings.max_upload_bytes
     db_url = os.getenv("DATABASE_URL")
     store = AppStore(
         base_dir=base_dir,
@@ -140,8 +144,9 @@ def create_app(base_dir: Path, csv_file: str | None = None) -> Flask:
             with store._conn() as conn:
                 conn.execute("SELECT 1")
             return {"ok": True, "database": "postgres" if store.is_postgres else "sqlite"}, 200
-        except Exception as exc:
-            return {"ok": False, "error": str(exc)}, 503
+        except Exception:
+            app.logger.exception("healthz.failed")
+            return {"ok": False, "error": "Health check failed."}, 503
 
     def feature_enabled(view: str) -> bool:
         return bool(settings.features.get(view, True))

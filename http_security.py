@@ -1,16 +1,76 @@
 import secrets
 from functools import wraps
 
-from flask import jsonify, redirect, render_template, request, session, url_for
+from flask import current_app, g, jsonify, redirect, render_template, request, session, url_for
+from werkzeug.exceptions import HTTPException
 
 from auth_store import normalize_username
+from core.errors import ConcurrencyError
 from core.rbac import ROLE_ALLOWED_VIEWS
 from core.time import get_now
 
 
+PUBLIC_EXCEPTIONS = (ValueError, FileNotFoundError, PermissionError, ConcurrencyError)
+
+
+def api_error_response(exc: Exception, status: int = 500):
+    if isinstance(exc, FileNotFoundError):
+        status = 404
+    elif isinstance(exc, PermissionError):
+        status = 403
+    elif isinstance(exc, (ValueError, ConcurrencyError)):
+        status = status if status in {400, 409} else 400
+
+    public = isinstance(exc, PUBLIC_EXCEPTIONS)
+    message = str(exc) if public else ("Solicitud invalida." if status < 500 else "Error interno del servidor.")
+    request_id = getattr(g, "request_id", "")
+
+    log_extra = {
+        "request_id": request_id,
+        "method": request.method,
+        "path": request.path,
+        "status": status,
+        "user": session.get("username"),
+        "role": session.get("role"),
+    }
+    if status >= 500 or not public:
+        current_app.logger.exception("request.error", extra=log_extra)
+    else:
+        current_app.logger.warning("request.rejected", extra=log_extra)
+
+    return jsonify({"ok": False, "error": message, "request_id": request_id}), status
+
+
 def configure_http_security(app, store):
     def api_unauthorized(message: str, status: int):
-        return jsonify({"ok": False, "error": message}), status
+        return jsonify({"ok": False, "error": message, "request_id": getattr(g, "request_id", "")}), status
+
+    def expected_origins() -> set[str]:
+        forwarded_proto = (request.headers.get("X-Forwarded-Proto") or request.scheme or "").split(",")[0].strip()
+        forwarded_host = (request.headers.get("X-Forwarded-Host") or request.host or "").split(",")[0].strip()
+        origins = {request.host_url.rstrip("/")}
+        if forwarded_proto and forwarded_host:
+            origins.add(f"{forwarded_proto}://{forwarded_host}".rstrip("/"))
+        return origins
+
+    @app.errorhandler(HTTPException)
+    def handle_http_exception(exc):
+        if request.path.startswith("/api/"):
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": exc.description or exc.name,
+                    "request_id": getattr(g, "request_id", ""),
+                }
+            ), exc.code or 500
+        return exc
+
+    @app.errorhandler(Exception)
+    def handle_unexpected_exception(exc):
+        if request.path.startswith("/api/") or request.accept_mimetypes.best == "application/json":
+            return api_error_response(exc, 500)
+        current_app.logger.exception("request.unhandled", extra={"request_id": getattr(g, "request_id", "")})
+        return "Error interno del servidor.", 500
 
     def ensure_csrf_token() -> str:
         token = session.get("_csrf_token")
@@ -50,6 +110,17 @@ def configure_http_security(app, store):
             "csrf_token": ensure_csrf_token(),
             "instance_meta": app.config["INSTANCE_META"],
         }
+
+    @app.before_request
+    def enforce_same_origin_for_mutations():
+        if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
+            return None
+        if request.path.startswith("/static/"):
+            return None
+        origin = request.headers.get("Origin")
+        if origin and origin.rstrip("/") not in expected_origins():
+            return api_unauthorized("Origen no autorizado.", 403)
+        return None
 
     @app.before_request
     def csrf_protect():
@@ -114,10 +185,26 @@ def configure_http_security(app, store):
         return deco
 
     @app.after_request
-    def no_cache(response):
+    def security_headers(response):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "img-src 'self' data:; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "object-src 'none'; "
+            "base-uri 'self'; "
+            "frame-ancestors 'none'; "
+            "form-action 'self'"
+        )
+        if app.config.get("SESSION_COOKIE_SECURE"):
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
 
     return {

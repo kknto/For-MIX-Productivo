@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from core.rbac import roles_for_view
+from http_security import api_error_response
 from repositories.fleet_repository import FleetRepository
 from services.fleet_service import FleetService
 
@@ -26,8 +27,8 @@ def register_fleet_routes(app, store, login_required, require_roles):
         except Exception as exc:
             msg = str(exc)
             if "unique" in msg.lower() or "duplicate" in msg.lower():
-                msg = "Ya existe un vehiculo con ese numero de unidad."
-            return jsonify({"ok": False, "error": msg}), 400
+                return jsonify({"ok": False, "error": "Ya existe un vehiculo con ese numero de unidad."}), 400
+            return api_error_response(exc, 400)
 
     @fleet_bp.route("/vehicles/<int:vehicle_id>", methods=["DELETE"])
     @require_roles(*roles_for_view("flotilla"))
@@ -57,7 +58,7 @@ def register_fleet_routes(app, store, login_required, require_roles):
         try:
             return jsonify(fleet_service.save_fuel(data, actor=request.current_user["username"]))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @fleet_bp.route("/fuel/<int:record_id>", methods=["PUT"])
     @require_roles(*roles_for_view("flotilla"))
@@ -66,7 +67,7 @@ def register_fleet_routes(app, store, login_required, require_roles):
         try:
             return jsonify(fleet_service.edit_fuel(record_id, data))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @fleet_bp.route("/fuel/<int:record_id>", methods=["DELETE"])
     @require_roles(*roles_for_view("flotilla"))
@@ -112,7 +113,7 @@ def register_fleet_routes(app, store, login_required, require_roles):
         try:
             return jsonify(fleet_service.save_maintenance(data, actor=request.current_user["username"]))
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 400
+            return api_error_response(exc, 400)
 
     @fleet_bp.route("/maintenance/<int:record_id>", methods=["DELETE"])
     @require_roles(*roles_for_view("flotilla"))
