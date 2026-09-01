@@ -27,6 +27,5 @@ services:
 databases:
   - name: formix-preprod-db
     plan: free
-    diskSizeGB: 1
     databaseName: formix_preprod
     user: formix_preprod
