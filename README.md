@@ -76,6 +76,8 @@ Documentacion complementaria:
 - Recomendado: cambiar credenciales iniciales en despliegue productivo.
 - Si `DATABASE_URL` esta definido, por defecto la app ya no inserta usuarios iniciales salvo que
   `FORMIX_ALLOW_DEFAULT_USERS=1`.
+- En Render/pre-productivo, usar `FORMIX_BOOTSTRAP_ADMIN_PASSWORD` para crear
+  solo el primer usuario `admin` en una base vacia. Ver `PREPRODUCTIVO_RENDER.md`.
 
 ## Validacion rapida
 

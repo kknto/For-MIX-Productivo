@@ -1,8 +1,9 @@
 import json
+import os
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from auth_store import normalize_username
+from auth_store import normalize_username, validate_password_policy
 from core.dataset_ops import content_hash, guess_family_from_filename
 from core.rbac import DEFAULT_USER_PASSWORD, DEFAULT_USERS
 from core.time import now_str
@@ -10,6 +11,7 @@ from core.time import now_str
 
 def seed_store_defaults(store, conn) -> None:
     now = now_str()
+    _seed_bootstrap_admin(conn, now)
     if store.allow_default_users:
         for item in DEFAULT_USERS:
             conn.execute(
@@ -43,6 +45,41 @@ def seed_store_defaults(store, conn) -> None:
                 )
 
     _backfill_dataset_metadata(conn)
+
+
+def _seed_bootstrap_admin(conn, now: str) -> None:
+    password = os.getenv("FORMIX_BOOTSTRAP_ADMIN_PASSWORD", "").strip()
+    if not password:
+        return
+
+    existing = conn.execute("SELECT COUNT(*) AS total FROM users").fetchone()
+    if int(existing["total"] or 0) > 0:
+        return
+
+    policy_error = validate_password_policy(password)
+    if policy_error:
+        raise ValueError(f"FORMIX_BOOTSTRAP_ADMIN_PASSWORD invalida: {policy_error}")
+
+    username = normalize_username(os.getenv("FORMIX_BOOTSTRAP_ADMIN_USERNAME", "admin"))
+    if not username:
+        raise ValueError("FORMIX_BOOTSTRAP_ADMIN_USERNAME invalido.")
+
+    conn.execute(
+        """
+        INSERT INTO users(username,role,password_hash,is_active,must_change_password,password_updated_at,created_at,updated_at,last_login_at)
+        VALUES(?,?,?,?,?,?,?,?,NULL)
+        """,
+        (
+            username,
+            "administrador",
+            generate_password_hash(password),
+            1,
+            1,
+            "",
+            now,
+            now,
+        ),
+    )
 
 
 def _backfill_dataset_metadata(conn) -> None:

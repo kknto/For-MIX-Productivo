@@ -17,6 +17,10 @@ services:
         value: 1
       - key: FORMIX_ALLOW_DEFAULT_USERS
         value: 0
+      - key: FORMIX_BOOTSTRAP_ADMIN_USERNAME
+        value: admin
+      - key: FORMIX_BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
       - key: APP_TIMEZONE
         value: America/Cancun
       - key: APP_SECRET_KEY

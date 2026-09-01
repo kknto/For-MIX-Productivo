@@ -25,8 +25,32 @@ Variables configuradas por Blueprint:
 - `APP_SECRET_KEY`: generado por Render
 - `SESSION_COOKIE_SECURE=1`
 - `FORMIX_ALLOW_DEFAULT_USERS=0`
+- `FORMIX_BOOTSTRAP_ADMIN_USERNAME=admin`
+- `FORMIX_BOOTSTRAP_ADMIN_PASSWORD`: secreto solicitado por Render
 - `APP_TIMEZONE=America/Cancun`
 - `TZ=America/Cancun`
+
+## Primer ingreso
+
+En una base PostgreSQL nueva no se crean usuarios default porque
+`FORMIX_ALLOW_DEFAULT_USERS=0`. Para habilitar el primer ingreso, Render debe
+tener `FORMIX_BOOTSTRAP_ADMIN_PASSWORD` con una contrasena temporal fuerte.
+
+Al arrancar, si la tabla `users` esta vacia y esa variable existe, ForMIX crea
+un unico usuario administrador:
+
+- Usuario: `admin`
+- Contrasena: el valor de `FORMIX_BOOTSTRAP_ADMIN_PASSWORD`
+
+Ese usuario se crea con cambio obligatorio de contrasena. Despues del primer
+ingreso exitoso:
+
+1. Cambiar la contrasena desde la pantalla obligatoria.
+2. Eliminar `FORMIX_BOOTSTRAP_ADMIN_PASSWORD` de las variables de Render.
+3. Reiniciar el servicio.
+
+La variable no vuelve a crear usuarios si ya existe al menos un registro en
+`users`.
 
 ## Orden de migracion recomendado
 

@@ -22,6 +22,8 @@ class SmokeValidationTests(unittest.TestCase):
             "APP_TIMEZONE": os.getenv("APP_TIMEZONE"),
             "SESSION_COOKIE_SECURE": os.getenv("SESSION_COOKIE_SECURE"),
             "FORMIX_ALLOW_DEFAULT_USERS": os.getenv("FORMIX_ALLOW_DEFAULT_USERS"),
+            "FORMIX_BOOTSTRAP_ADMIN_USERNAME": os.getenv("FORMIX_BOOTSTRAP_ADMIN_USERNAME"),
+            "FORMIX_BOOTSTRAP_ADMIN_PASSWORD": os.getenv("FORMIX_BOOTSTRAP_ADMIN_PASSWORD"),
         }
 
         os.environ["APP_SECRET_KEY"] = "smoke-validation-secret"
@@ -29,6 +31,8 @@ class SmokeValidationTests(unittest.TestCase):
         os.environ["APP_TIMEZONE"] = "America/Cancun"
         os.environ["SESSION_COOKIE_SECURE"] = "0"
         os.environ["FORMIX_ALLOW_DEFAULT_USERS"] = "1"
+        os.environ.pop("FORMIX_BOOTSTRAP_ADMIN_USERNAME", None)
+        os.environ.pop("FORMIX_BOOTSTRAP_ADMIN_PASSWORD", None)
 
         self.csv_name = "bootstrap.csv"
         (self.base_dir / self.csv_name).write_text(
@@ -128,6 +132,44 @@ class SmokeValidationTests(unittest.TestCase):
 
         self.assertEqual(self.app.config["BASE_DIR"], str(self.base_dir.resolve()))
         self.assertTrue(Path(self.app.config["QC_UPLOADS_DIR"]).exists())
+
+    def test_bootstrap_admin_is_created_for_empty_preprod_instance(self):
+        bootstrap_base = self.tmp_root / f"{uuid4().hex}_bootstrap_admin"
+        bootstrap_base.mkdir(parents=True, exist_ok=True)
+        os.environ["FORMIX_ALLOW_DEFAULT_USERS"] = "0"
+        os.environ["FORMIX_BOOTSTRAP_ADMIN_USERNAME"] = "admin"
+        os.environ["FORMIX_BOOTSTRAP_ADMIN_PASSWORD"] = "Preprod#2026X"
+        app = create_app(base_dir=bootstrap_base)
+        app.testing = True
+        client = app.test_client()
+        store = app.extensions["formix_store"]
+
+        with store._conn() as conn:
+            rows = conn.execute(
+                "SELECT username,role,must_change_password FROM users ORDER BY id"
+            ).fetchall()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["username"], "admin")
+        self.assertEqual(rows[0]["role"], "administrador")
+        self.assertEqual(int(rows[0]["must_change_password"]), 1)
+
+        response = client.get("/login")
+        self.assertEqual(response.status_code, 200)
+        with client.session_transaction() as session:
+            csrf = session.get("_csrf_token")
+        self.assertTrue(csrf)
+        login_resp = client.post(
+            "/login",
+            data={
+                "username": "admin",
+                "password": "Preprod#2026X",
+                "_csrf_token": csrf,
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(login_resp.status_code, 302)
+        self.assertIn("/change-password", login_resp.headers.get("Location", ""))
+        shutil.rmtree(bootstrap_base, ignore_errors=True)
 
     def test_presupuestador_is_blocked_from_non_consulta_modules(self):
         self._login("presupuestador", "Presu#2026!X")
