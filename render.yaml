@@ -23,6 +23,8 @@ services:
         sync: false
       - key: APP_TIMEZONE
         value: America/Cancun
+      - key: FORMIX_ALLOWED_ORIGINS
+        value: https://formix-preprod.onrender.com
       - key: APP_SECRET_KEY
         generateValue: true
       - key: TZ

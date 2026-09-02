@@ -24,6 +24,7 @@ class SmokeValidationTests(unittest.TestCase):
             "FORMIX_ALLOW_DEFAULT_USERS": os.getenv("FORMIX_ALLOW_DEFAULT_USERS"),
             "FORMIX_BOOTSTRAP_ADMIN_USERNAME": os.getenv("FORMIX_BOOTSTRAP_ADMIN_USERNAME"),
             "FORMIX_BOOTSTRAP_ADMIN_PASSWORD": os.getenv("FORMIX_BOOTSTRAP_ADMIN_PASSWORD"),
+            "FORMIX_ALLOWED_ORIGINS": os.getenv("FORMIX_ALLOWED_ORIGINS"),
         }
 
         os.environ["APP_SECRET_KEY"] = "smoke-validation-secret"
@@ -33,6 +34,7 @@ class SmokeValidationTests(unittest.TestCase):
         os.environ["FORMIX_ALLOW_DEFAULT_USERS"] = "1"
         os.environ.pop("FORMIX_BOOTSTRAP_ADMIN_USERNAME", None)
         os.environ.pop("FORMIX_BOOTSTRAP_ADMIN_PASSWORD", None)
+        os.environ.pop("FORMIX_ALLOWED_ORIGINS", None)
 
         self.csv_name = "bootstrap.csv"
         (self.base_dir / self.csv_name).write_text(
@@ -136,6 +138,15 @@ class SmokeValidationTests(unittest.TestCase):
         )
         self.assertEqual(origin_resp.status_code, 403)
         self.assertEqual(origin_resp.get_json()["error"], "Origen no autorizado.")
+
+        os.environ["FORMIX_ALLOWED_ORIGINS"] = "https://formix-preprod.onrender.com"
+        allowed_origin_resp = self.client.post(
+            "/api/remisiones/save",
+            json={},
+            headers={"Origin": "https://formix-preprod.onrender.com"},
+        )
+        self.assertEqual(allowed_origin_resp.status_code, 403)
+        self.assertNotEqual(allowed_origin_resp.get_json()["error"], "Origen no autorizado.")
 
     def _build_remision_snapshot(self, material_id: int, *, real_weight: float = 250.0):
         return {

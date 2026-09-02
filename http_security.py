@@ -1,3 +1,4 @@
+import os
 import secrets
 from functools import wraps
 
@@ -49,6 +50,11 @@ def configure_http_security(app, store):
         forwarded_proto = (request.headers.get("X-Forwarded-Proto") or request.scheme or "").split(",")[0].strip()
         forwarded_host = (request.headers.get("X-Forwarded-Host") or request.host or "").split(",")[0].strip()
         origins = {request.host_url.rstrip("/")}
+        for env_key in ("FORMIX_ALLOWED_ORIGINS", "FORMIX_PUBLIC_ORIGIN", "APP_PUBLIC_ORIGIN", "RENDER_EXTERNAL_URL"):
+            for configured in (os.getenv(env_key, "") or "").split(","):
+                configured = configured.strip().rstrip("/")
+                if configured:
+                    origins.add(configured)
         if forwarded_proto and forwarded_host:
             origins.add(f"{forwarded_proto}://{forwarded_host}".rstrip("/"))
         return origins
@@ -119,6 +125,17 @@ def configure_http_security(app, store):
             return None
         origin = request.headers.get("Origin")
         if origin and origin.rstrip("/") not in expected_origins():
+            current_app.logger.warning(
+                "request.origin_rejected",
+                extra={
+                    "request_id": getattr(g, "request_id", ""),
+                    "method": request.method,
+                    "path": request.path,
+                    "status": 403,
+                    "origin": origin,
+                    "host": request.host,
+                },
+            )
             return api_unauthorized("Origen no autorizado.", 403)
         return None
 
