@@ -139,6 +139,16 @@ class SmokeValidationTests(unittest.TestCase):
         self.assertEqual(origin_resp.status_code, 403)
         self.assertEqual(origin_resp.get_json()["error"], "Origen no autorizado.")
 
+        with self.client.session_transaction() as session:
+            csrf = session.get("_csrf_token")
+        null_origin_login = self.client.post(
+            "/login",
+            data={"username": "admin", "password": "Admin#2026!X", "_csrf_token": csrf},
+            headers={"Origin": "null"},
+            follow_redirects=False,
+        )
+        self.assertEqual(null_origin_login.status_code, 302)
+
         os.environ["FORMIX_ALLOWED_ORIGINS"] = "https://formix-preprod.onrender.com"
         allowed_origin_resp = self.client.post(
             "/api/remisiones/save",

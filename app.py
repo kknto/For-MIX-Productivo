@@ -148,6 +148,10 @@ def create_app(base_dir: Path, csv_file: str | None = None) -> Flask:
             app.logger.exception("healthz.failed")
             return {"ok": False, "error": "Health check failed."}, 503
 
+    @app.get("/favicon.ico")
+    def favicon():
+        return app.send_static_file("img/logo_formix.svg")
+
     def feature_enabled(view: str) -> bool:
         return bool(settings.features.get(view, True))
 

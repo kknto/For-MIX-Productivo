@@ -124,6 +124,8 @@ def configure_http_security(app, store):
         if request.path.startswith("/static/"):
             return None
         origin = request.headers.get("Origin")
+        if origin and origin.strip().lower() == "null":
+            return None
         if origin and origin.rstrip("/") not in expected_origins():
             current_app.logger.warning(
                 "request.origin_rejected",
